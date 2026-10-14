@@ -4,8 +4,10 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
+import { useNotifications } from "@/lib/notifications";
 import { useSession } from "@/lib/session";
 import { Avatar, Icon, type IconName } from "./Icon";
+import { NotificationBell } from "./NotificationBell";
 
 interface NavItem { href: string; label: string; icon: IconName; permission?: string; soon?: boolean }
 
@@ -14,7 +16,7 @@ const MAIN: NavItem[] = [
   { href: "/tickets", label: "All Tickets", icon: "ticket" },
   { href: "/tickets/mine", label: "My Tickets", icon: "mine" },
   { href: "/tickets/new", label: "Create Ticket", icon: "create", permission: "TICKET_CREATE" },
-  { href: "/notifications", label: "Notifications", icon: "bell", soon: true },
+  { href: "/notifications", label: "Notifications", icon: "bell" },
 ];
 
 const ADMIN: NavItem[] = [
@@ -29,6 +31,7 @@ function writePref(key: string, v: string) { try { localStorage.setItem(key, v);
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const { me, can } = useSession();
+  const { unread } = useNotifications();
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [drawer, setDrawer] = useState(false);
@@ -56,6 +59,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       <Link key={n.href} href={n.href} className={active ? "active" : undefined} aria-current={active ? "page" : undefined} title={n.label}>
         <Icon name={n.icon} />
         <span>{n.label}</span>
+        {n.href === "/notifications" && unread > 0 && <span className="count hot">{unread > 99 ? "99+" : unread}</span>}
       </Link>
     );
   };
@@ -100,9 +104,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <input type="search" placeholder="Search tickets, people, patches…" aria-label="Global search" disabled title="Search arrives with tickets" />
           </label>
           <div className="top-actions">
-            <button className="icon-btn" type="button" aria-label="Notifications" disabled title="Notifications arrive in a later phase">
-              <Icon name="bell" />
-            </button>
+            <NotificationBell />
             {me && <ProfileMenu name={me.fullName} color={me.avatarColor} role={me.roles[0]?.name ?? ""} />}
           </div>
         </header>

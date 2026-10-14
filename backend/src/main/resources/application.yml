@@ -59,3 +59,14 @@ ats:
   attachments:
     dir: ${ATS_ATTACHMENTS_DIR:./data/attachments}
     max-mb: ${ATS_ATTACHMENTS_MAX_MB:20}
+  # Base URL used in links inside notification emails.
+  public-url: ${ATS_PUBLIC_URL:http://localhost:3010}
+  # Email is always queued in ATS_EMAIL_OUTBOX; it is only sent while enabled is true.
+  mail:
+    enabled: ${ATS_MAIL_ENABLED:false}
+    host: ${ATS_MAIL_HOST:}
+    port: ${ATS_MAIL_PORT:25}
+    from: ${ATS_MAIL_FROM:}
+    username: ${ATS_MAIL_USERNAME:}
+    password: ${ATS_MAIL_PASSWORD:}
+    starttls: ${ATS_MAIL_STARTTLS:false}

@@ -54,6 +54,7 @@ public class TicketService {
     private final WorkflowActions workflowActions;
     private final DiscussionRecords.Comments comments;
     private final DiscussionRecords.Attachments attachments;
+    private final TicketNotifier notifier;
 
     /* ------------------------------------------------------------------ inputs */
 
@@ -130,6 +131,9 @@ public class TicketService {
         if (t.getAssigneeId() != null) log(t.getId(), me.id(), "ASSIGNEE_CHANGED", "assignee", null, l.name(t.getAssigneeId()), null);
         if (t.getReviewerId() != null) log(t.getId(), me.id(), "REVIEWER_CHANGED", "reviewer", null, l.name(t.getReviewerId()), null);
         if (t.getTesterId() != null) log(t.getId(), me.id(), "TESTER_CHANGED", "tester", null, l.name(t.getTesterId()), null);
+        notifier.assigned(t, l, me.id(), t.getAssigneeId());
+        notifier.reviewerSet(t, l, me.id(), t.getReviewerId());
+        notifier.testerSet(t, l, me.id(), t.getTesterId());
 
         List<Long> collaborators = in.collaboratorIds() == null ? List.of() : in.collaboratorIds().stream().filter(Objects::nonNull).distinct().toList();
         if (!collaborators.isEmpty()) {
@@ -138,6 +142,7 @@ public class TicketService {
                 activeUser(uid, l, "collaborator");
                 addPerson(t.getId(), uid, PersonKind.COLLABORATOR, me.id(), now);
                 log(t.getId(), me.id(), "COLLABORATOR_ADDED", "collaborators", null, l.name(uid), null);
+                notifier.collaboratorAdded(t, l, me.id(), uid);
             }
         }
         if (in.relatedTicketIds() != null) {
@@ -251,6 +256,11 @@ public class TicketService {
         if (!Objects.equals(before, userId)) {
             log(id, me.id(), role.name() + "_CHANGED", role.name().toLowerCase(), l.name(before), l.name(userId), null);
             touch(t, me.id());
+            switch (role) {
+                case ASSIGNEE -> notifier.assigned(t, l, me.id(), userId);
+                case REVIEWER -> notifier.reviewerSet(t, l, me.id(), userId);
+                default -> notifier.testerSet(t, l, me.id(), userId);
+            }
         }
         return toDetail(t, l);
     }
@@ -267,6 +277,7 @@ public class TicketService {
         addPerson(id, userId, PersonKind.COLLABORATOR, me.id(), Instant.now());
         log(id, me.id(), "COLLABORATOR_ADDED", "collaborators", null, l.name(userId), null);
         touch(t, me.id());
+        notifier.collaboratorAdded(t, l, me.id(), userId);
         return toDetail(t, l);
     }
 

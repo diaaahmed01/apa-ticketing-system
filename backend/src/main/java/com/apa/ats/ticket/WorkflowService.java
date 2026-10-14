@@ -37,6 +37,7 @@ public class WorkflowService {
     private final TicketRecords.People people;
     private final TicketRecords.Links links;
     private final AccessGuard guard;
+    private final TicketNotifier notifier;
 
     public record VerifyResult(Detail ticket, Long followUpId) {}
 
@@ -78,7 +79,9 @@ public class WorkflowService {
         t.setTestResult(null);
         move(c, Status.CODE_REVIEW, null);
         tickets.log(id, c.me().id(), "REVIEW_SUBMITTED", null, null, c.l().name(t.getReviewerId()), null);
-        return done(c);
+        Detail d = done(c);
+        notifier.reviewRequested(t, c.l(), c.me().id());
+        return d;
     }
 
     @Transactional
@@ -89,7 +92,9 @@ public class WorkflowService {
         c.t().setTestResult(null);
         move(c, Status.TESTING, why);
         tickets.log(c.id(), c.me().id(), "REVIEW_SKIPPED", null, null, null, null);
-        return done(c);
+        Detail d = done(c);
+        notifier.testRequested(c.t(), c.l(), c.me().id(), why);
+        return d;
     }
 
     @Transactional
@@ -107,7 +112,10 @@ public class WorkflowService {
         String why = reason(reason, !approve);
         move(c, approve ? Status.TESTING : Status.IN_PROGRESS, why);
         tickets.log(c.id(), me, approve ? "REVIEW_APPROVED" : "REVIEW_REJECTED", null, null, null, null);
-        return done(c);
+        Detail d = done(c);
+        if (approve) notifier.reviewApproved(c.t(), c.l(), me, why);
+        else notifier.reviewRejected(c.t(), c.l(), me, why);
+        return d;
     }
 
     @Transactional
@@ -132,7 +140,10 @@ public class WorkflowService {
             move(c, Status.IN_PROGRESS, why);
             tickets.log(c.id(), me, "TEST_FAILED", null, null, null, null);
         }
-        return done(c);
+        Detail d = done(c);
+        if (pass) notifier.testPassed(c.t(), c.l(), me, why);
+        else notifier.testFailed(c.t(), c.l(), me, why);
+        return d;
     }
 
     @Transactional
@@ -143,7 +154,9 @@ public class WorkflowService {
             throw ApiException.conflict("TEST_NOT_PASSED", "Testing must pass before the fix is ready for deployment.");
         }
         move(c, Status.READY_FOR_DEPLOYMENT, null);
-        return done(c);
+        Detail d = done(c);
+        notifier.statusChanged(c.t(), Status.READY_FOR_DEPLOYMENT, c.me().id(), null);
+        return d;
     }
 
     @Transactional
@@ -161,7 +174,9 @@ public class WorkflowService {
         move(c, Status.DEPLOYED, null);
         move(c, Status.PRODUCTION_VERIFICATION, null);
         tickets.log(c.id(), c.me().id(), "DEPLOYED", "patchReference", null, t.getPatchReference(), null);
-        return done(c);
+        Detail d = done(c);
+        notifier.deployed(t, c.me().id());
+        return d;
     }
 
     @Transactional
@@ -173,14 +188,18 @@ public class WorkflowService {
         if (pass) {
             closeAs(c, Closure.RESOLVED, why);
             tickets.log(c.id(), c.me().id(), "VERIFIED", null, null, null, null);
-            return new VerifyResult(done(c), null);
+            Detail d = done(c);
+            notifier.closed(c.t(), c.l(), c.me().id(), Closure.RESOLVED, why);
+            return new VerifyResult(d, null);
         }
         guard.require("VERIFY_CREATE_RELATED", c.rel());
         Ticket next = followUp(c, why, followUpTitle);
         closeAs(c, Closure.UNRESOLVED, why);
         tickets.log(c.id(), c.me().id(), "VERIFICATION_FAILED", null, null, "TKT-" + next.getId(), null);
         tickets.log(c.id(), c.me().id(), "FOLLOW_UP_CREATED", "followUp", null, "TKT-" + next.getId(), null);
-        return new VerifyResult(done(c), next.getId());
+        Detail d = done(c);
+        notifier.verificationFailed(c.t(), next, c.l(), c.me().id(), why);
+        return new VerifyResult(d, next.getId());
     }
 
     @Transactional
@@ -222,7 +241,9 @@ public class WorkflowService {
         move(c, Status.BLOCKED, why);
         String waiting = dependency != null ? "TKT-" + dependency.getId() + (patch != null ? " and patch " + patch : "") : "patch " + patch;
         tickets.log(id, c.me().id(), "BLOCKED", "blockedBy", null, waiting, null);
-        return done(c);
+        Detail d = done(c);
+        notifier.blocked(t, c.l(), c.me().id(), why);
+        return d;
     }
 
     @Transactional
@@ -236,25 +257,33 @@ public class WorkflowService {
         links.deleteAll(blockLinks(id));
         move(c, back, why);
         tickets.log(id, c.me().id(), "UNBLOCKED", null, null, null, null);
-        return done(c);
+        Detail d = done(c);
+        notifier.unblocked(t, c.l(), c.me().id(), why);
+        return d;
     }
 
     @Transactional
     public Detail cancel(Long id, Integer version, String reason) {
         Ctx c = open(id, version);
         guard.require("TICKET_CANCEL", c.rel());
-        closeAs(c, Closure.CANCELLED, reason(reason, true));
+        String why = reason(reason, true);
+        closeAs(c, Closure.CANCELLED, why);
         tickets.log(id, c.me().id(), "CANCELLED", null, null, null, null);
-        return done(c);
+        Detail d = done(c);
+        notifier.closed(c.t(), c.l(), c.me().id(), Closure.CANCELLED, why);
+        return d;
     }
 
     @Transactional
     public Detail close(Long id, Integer version, String reason) {
         Ctx c = open(id, version);
         guard.require("TICKET_CLOSE", c.rel());
-        closeAs(c, Closure.UNRESOLVED, reason(reason, true));
+        String why = reason(reason, true);
+        closeAs(c, Closure.UNRESOLVED, why);
         tickets.log(id, c.me().id(), "CLOSED_UNRESOLVED", null, null, null, null);
-        return done(c);
+        Detail d = done(c);
+        notifier.closed(c.t(), c.l(), c.me().id(), Closure.UNRESOLVED, why);
+        return d;
     }
 
     @Transactional

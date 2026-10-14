@@ -47,6 +47,7 @@ public class DiscussionService {
     private final DiscussionRecords.Attachments attachments;
     private final AttachmentStorage storage;
     private final AccessGuard guard;
+    private final TicketNotifier notifier;
 
     /** A downloadable file: the metadata and where it lives. */
     public record Download(Attachment attachment, Path path) {}
@@ -88,6 +89,7 @@ public class DiscussionService {
         List<Attachment> saved = saveFiles(ticketId, c.getId(), Purpose.COMMENT, checked, me.id());
 
         Lookup l = tickets.lookup();
+        notifier.commented(t, l, me.id(), text);
         return commentView(c, t, me, l, saved);
     }
 
