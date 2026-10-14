@@ -1,0 +1,49 @@
+server:
+  port: ${ATS_PORT:8095}   # Orbit uses 8090; 8080 is SPS GlassFish.
+  shutdown: graceful
+
+spring:
+  application:
+    name: ats-backend
+  # ATS shares Orbit's schema for now; every ATS table is prefixed ATS_.
+  # The password has no default on purpose — set ATS_DB_PASSWORD in the environment.
+  datasource:
+    url: jdbc:oracle:thin:@//${ATS_DB_HOST:10.0.11.56}:${ATS_DB_PORT:1521}/${ATS_DB_SERVICE:intgtest}
+    driver-class-name: oracle.jdbc.OracleDriver
+    username: ${ATS_DB_USER:SIMW}
+    password: ${ATS_DB_PASSWORD:}
+    hikari:
+      pool-name: ats-pool
+      maximum-pool-size: 10
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Never let Hibernate touch the shared schema: ATS tables are created only
+      # by the versioned scripts in db/ats (see SchemaMigrator).
+      ddl-auto: none
+    properties:
+      hibernate:
+        # ATS columns are plain TIMESTAMP (not WITH TIME ZONE), read in the server's zone.
+        type.preferred_instant_jdbc_type: TIMESTAMP
+    show-sql: false
+
+ats:
+  db:
+    migrate: ${ATS_DB_MIGRATE:true}
+  security:
+    # Separate from Orbit's secret: an Orbit token is never valid in ATS.
+    jwt-secret: ${ATS_JWT_SECRET:}
+    session-hours: 10
+    cookie-name: ATS_SESSION
+    cookie-secure: ${ATS_COOKIE_SECURE:false}
+    max-failed-logins: 5
+    lock-minutes: 15
+  bootstrap-admin:
+    username: ${ATS_ADMIN_USERNAME:admin}
+    full-name: System Administrator
+    email: ${ATS_ADMIN_EMAIL:}
+    # Used only when ATS_USERS is empty. If blank, a random password is generated
+    # and printed once to the log; the admin must change it on first login.
+    initial-password: ${ATS_ADMIN_INITIAL_PASSWORD:}
+  cors:
+    allowed-origins: ${ATS_CORS_ORIGINS:http://localhost:3010}

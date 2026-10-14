@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mockups",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "5510", "--bind", "127.0.0.1", "--directory", "mockups"],
+      "port": 5510
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": ".tools/node/node.exe",
+      "runtimeArgs": ["frontend/node_modules/next/dist/bin/next", "dev", "frontend", "-p", "3010"],
+      "port": 3010
+    }
+  ]
+}

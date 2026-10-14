@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>All Tickets · ATS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Cairo:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css">
+<style>
+  .toolbar { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+  .toolbar-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .local-search { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; width: 300px; max-width: 100%; background: #fff; border: 1px solid var(--line-2); border-radius: 9px; color: var(--muted); transition: border-color .15s, box-shadow .15s; }
+  .local-search:focus-within { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(40,120,227,.14); }
+  .local-search input { border: 0; outline: 0; flex: 1; font: inherit; color: var(--text); min-width: 0; background: transparent; }
+  .local-search input::placeholder { color: var(--muted); }
+  .divider-v { width: 1px; height: 22px; background: var(--line-2); margin: 0 2px; }
+  .chip-select .n { min-width: 18px; height: 18px; border-radius: 9px; background: var(--blue); color: #fff; font-size: 11px; font-weight: 700; display: inline-grid; place-items: center; padding: 0 5px; }
+  .adv-row { display: none; padding: 10px 12px; background: var(--rail); border-radius: 10px; }
+  .adv-row.open { display: flex; }
+  .result-line { display: flex; align-items: center; gap: 10px; color: var(--text-2); font-size: 13px; flex-wrap: wrap; }
+  .result-line b { color: var(--navy); font-variant-numeric: tabular-nums; }
+  .clear-link { background: none; border: 0; color: var(--blue-ink); font-weight: 600; cursor: pointer; padding: 2px 4px; border-radius: 5px; }
+  .clear-link:hover { text-decoration: underline; }
+  .sort-sel { margin-inline-start: auto; display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted-2); }
+  .sort-sel select { border: 0; background: transparent; font: inherit; font-weight: 600; color: var(--navy); cursor: pointer; padding: 2px; }
+
+  .ticket-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(336px, 1fr)); gap: 24px 22px; }
+
+  /* Popover for filter chips */
+  .pop { position: fixed; z-index: 60; min-width: 230px; max-width: 300px; background: #fff; border-radius: 12px; box-shadow: var(--shadow-pop), 0 0 0 1px rgba(20,40,63,.06); padding: 6px; display: none; }
+  .pop.open { display: block; animation: pop .18s var(--ease); }
+  .pop-search { display: flex; align-items: center; gap: 6px; padding: 6px 8px 8px; border-bottom: 1px solid var(--line); margin-bottom: 4px; color: var(--muted); }
+  .pop-search input { border: 0; outline: 0; font: inherit; flex: 1; min-width: 0; }
+  .pop label.opt-row { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 7px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text); }
+  .pop label.opt-row:hover { background: var(--bg); }
+  .pop .opt-row .cnt { margin-inline-start: auto; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .pop-foot { display: flex; justify-content: space-between; border-top: 1px solid var(--line); margin-top: 4px; padding: 6px 4px 2px; }
+
+  /* Table view */
+  .table-wrap { background: #fff; border: 1px solid var(--line); border-radius: var(--r-lg); overflow: auto; box-shadow: var(--shadow-1); }
+  table.data { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 1060px; }
+  table.data th { position: sticky; top: 0; background: var(--surface-2); text-align: start; font-size: 11.5px; font-weight: 600; color: var(--muted-2); letter-spacing: .04em; text-transform: uppercase; padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  table.data th button { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+  table.data th button:hover { color: var(--navy); }
+  table.data th button:focus-visible { outline: 2px solid var(--blue); border-radius: 4px; }
+  table.data td { padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--text); vertical-align: middle; white-space: nowrap; }
+  table.data tbody tr { cursor: pointer; transition: background .12s; }
+  table.data tbody tr:hover { background: #F7FAFE; }
+  table.data tbody tr:hover .t-title { color: var(--blue-ink); }
+  table.data tbody tr:last-child td { border-bottom: 0; }
+  table.data tbody tr:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+  .t-title { max-width: 380px; overflow: hidden; text-overflow: ellipsis; font-weight: 600; color: var(--navy); white-space: nowrap; }
+  .t-title.ar { font-family: var(--font-ar); }
+  /* ticket-stub ID chip: the silhouette survives even at table density */
+  .id-chip { --c: var(--p-low); display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px 0 9px; font-weight: 700; font-size: 12.5px; color: var(--navy); font-variant-numeric: tabular-nums; background: var(--navy-wash); border-radius: 5px;
+    -webkit-mask: radial-gradient(circle 4px at 0 50%, #0000 3.5px, #000 4px) left / 51% 100% no-repeat, radial-gradient(circle 4px at 100% 50%, #0000 3.5px, #000 4px) right / 51% 100% no-repeat;
+    mask: radial-gradient(circle 4px at 0 50%, #0000 3.5px, #000 4px) left / 51% 100% no-repeat, radial-gradient(circle 4px at 100% 50%, #0000 3.5px, #000 4px) right / 51% 100% no-repeat; }
+  .id-chip::before { content: ""; width: 3px; height: 12px; border-radius: 2px; background: var(--c); }
+  .id-chip.p-critical { --c: var(--p-critical); } .id-chip.p-high { --c: var(--p-high); } .id-chip.p-medium { --c: var(--p-medium); }
+  .cell-flex { display: inline-flex; align-items: center; gap: 6px; }
+  .cell-flex .icon { color: var(--muted); }
+
+  @media (max-width: 720px) {
+    .local-search { width: 100%; }
+    .ticket-grid { grid-template-columns: 1fr; gap: 18px; }
+    .head-actions .btn.primary span { display: none; }
+    .sort-sel { margin-inline-start: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
+    <main class="page">
+      <div class="page-head">
+        <div>
+          <h1>All Tickets</h1>
+          <p class="sub">Every issue raised between the port support team and Solutions Co.</p>
+        </div>
+        <div class="head-actions">
+          <div class="seg" role="group" aria-label="Display mode">
+            <button type="button" aria-pressed="true" data-view="tickets"><i data-icon="ticket" class="sm"></i>Tickets</button>
+            <button type="button" aria-pressed="false" data-view="table"><i data-icon="table" class="sm"></i>Table</button>
+          </div>
+          <a class="btn primary" href="create.html"><i data-icon="plus" class="sm"></i><span>Create ticket</span></a>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <div class="toolbar-row">
+          <label class="local-search"><i data-icon="search" class="sm"></i><input id="q" type="search" placeholder="Search by ID, title or description" aria-label="Search tickets"></label>
+          <div class="divider-v"></div>
+          <button class="chip-select" data-filter="status" type="button">Status<i data-icon="chevDown" class="xs"></i></button>
+          <button class="chip-select" data-filter="priority" type="button">Priority<i data-icon="chevDown" class="xs"></i></button>
+          <button class="chip-select" data-filter="module" type="button">Module<i data-icon="chevDown" class="xs"></i></button>
+          <button class="chip-select" data-filter="assignee" type="button">Assignee<i data-icon="chevDown" class="xs"></i></button>
+          <button class="chip-select" data-filter="env" type="button">Environment<i data-icon="chevDown" class="xs"></i></button>
+          <button class="chip-select" data-filter="type" type="button">Type<i data-icon="chevDown" class="xs"></i></button>
+          <button class="chip-select" data-filter="date" type="button"><i data-icon="calendar" class="xs"></i>Created<i data-icon="chevDown" class="xs"></i></button>
+          <button class="btn ghost sm" id="advBtn" type="button" aria-expanded="false"><i data-icon="filter" class="sm"></i>Advanced filters</button>
+        </div>
+        <div class="toolbar-row adv-row" id="advRow">
+          <button class="chip-select" data-filter="creator" type="button">Created by<i data-icon="chevDown" class="xs"></i></button>
+          <button class="chip-select" data-filter="reviewer" type="button">Reviewer<i data-icon="chevDown" class="xs"></i></button>
+          <button class="chip-select" data-filter="tester" type="button">Tester<i data-icon="chevDown" class="xs"></i></button>
+          <button class="chip-select" data-filter="closure" type="button">Closure result<i data-icon="chevDown" class="xs"></i></button>
+          <label class="chip-select" style="gap:8px"><input type="checkbox" class="checkbox" id="hasPatch">Has patch reference</label>
+        </div>
+        <div class="result-line">
+          <span>Showing <b id="shown">12</b> of <b>128</b> tickets</span>
+          <button class="clear-link" id="clearAll" type="button" hidden>Clear filters</button>
+          <label class="sort-sel">Sort by
+            <select id="sort">
+              <option value="new">Newest first</option>
+              <option value="old">Oldest first</option>
+              <option value="prio">Priority</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <section id="gridView" class="ticket-grid" aria-label="Tickets"></section>
+
+      <section id="tableView" class="table-wrap" hidden aria-label="Tickets table">
+        <table class="data">
+          <thead><tr>
+            <th><button type="button" data-sort="id">Ticket ID <i data-icon="chevDown" class="xs"></i></button></th>
+            <th>Title</th><th>Status</th>
+            <th><button type="button" data-sort="prio">Priority <i data-icon="chevDown" class="xs"></i></button></th>
+            <th>Module</th><th>Type</th><th>Environment</th><th>Assignee</th>
+            <th><button type="button" data-sort="created">Created at <i data-icon="chevDown" class="xs"></i></button></th>
+          </tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </section>
+
+      <div id="empty" class="empty panel" hidden>
+        <svg width="120" height="64" viewBox="0 0 120 64" aria-hidden="true"><path d="M8 6h104a4 4 0 0 1 4 4v14a8 8 0 0 0 0 16v14a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V40a8 8 0 0 0 0-16V10a4 4 0 0 1 4-4z" fill="#fff" stroke="#C3CDD9" stroke-width="1.5"/><path d="M14 32h92" stroke="#C3CDD9" stroke-width="1.5" stroke-dasharray="4 4"/><rect x="16" y="14" width="40" height="6" rx="3" fill="#E3E8EF"/><rect x="16" y="42" width="60" height="5" rx="2.5" fill="#E3E8EF"/></svg>
+        <h3>No tickets match these filters</h3>
+        <p>Try removing a filter or searching for the ticket number directly, for example <b>1042</b>.</p>
+        <button class="btn" id="emptyClear" type="button">Clear all filters</button>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="pop" id="pop" role="dialog" aria-label="Filter options"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+(function () {
+  const D = PITS;
+  UI.mount({ active: "tickets", crumbs: [{ label: "Tickets", href: "tickets.html" }, { label: "All Tickets" }] });
+
+  const TODAY = new Date("2026-10-14T12:00");
+  const PRANK = { critical: 0, high: 1, medium: 2, low: 3 };
+  const state = { q: "", view: "tickets", sort: "new", f: {} , patch: false };
+  try { const v = localStorage.getItem("pits-view"); if (v) state.view = v; } catch (e) {}
+
+  /* Filter definitions: options + accessor */
+  const statusKey = t => t.status === "closed" ? "closed" : t.status;
+  const people = Object.values(D.users).filter(u => u.active).map(u => [u.id, u.name]);
+  const FILTERS = {
+    status: { label: "Status", opts: Object.entries(D.statuses), get: statusKey },
+    priority: { label: "Priority", opts: Object.entries(D.priorities), get: t => t.priority },
+    module: { label: "Module", opts: D.modules.map(m => [m.name, m.name]), get: t => t.module },
+    assignee: { label: "Assignee", opts: [["none", "Unassigned"]].concat(people), get: t => t.assignee || "none", search: true },
+    env: { label: "Environment", opts: Object.entries(D.envs), get: t => t.env },
+    type: { label: "Type", opts: Object.entries(D.types), get: t => t.type },
+    creator: { label: "Created by", opts: people, get: t => t.creator, search: true },
+    reviewer: { label: "Reviewer", opts: people, get: t => t.reviewer, search: true },
+    tester: { label: "Tester", opts: people, get: t => t.tester, search: true },
+    closure: { label: "Closure result", opts: [["resolved", "Resolved"], ["unresolved", "Unresolved"], ["cancelled", "Cancelled"]], get: t => t.closure },
+    date: { label: "Created", single: true, opts: [["7", "Last 7 days"], ["14", "Last 14 days"], ["30", "Last 30 days"], ["90", "This quarter"]], get: t => t.created }
+  };
+
+  function matches(t) {
+    if (state.q) {
+      const q = state.q.toLowerCase().replace(/^#?tkt-?/, "");
+      if (!(String(t.id).includes(q) || t.title.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q))) return false;
+    }
+    if (state.patch && !t.patch) return false;
+    for (const k in state.f) {
+      const sel = state.f[k];
+      if (!sel || !sel.length) continue;
+      if (k === "date") { const days = (TODAY - new Date(t.created)) / 864e5; if (days > Number(sel[0])) return false; continue; }
+      if (!sel.includes(FILTERS[k].get(t))) return false;
+    }
+    return true;
+  }
+  function sorted(list) {
+    const l = list.slice();
+    if (state.sort === "old") l.sort((a, b) => a.created.localeCompare(b.created));
+    else if (state.sort === "prio") l.sort((a, b) => PRANK[a.priority] - PRANK[b.priority] || b.id - a.id);
+    else l.sort((a, b) => b.created.localeCompare(a.created));
+    return l;
+  }
+
+  function render() {
+    const list = sorted(D.tickets.filter(matches));
+    document.getElementById("shown").textContent = list.length;
+    const active = Object.values(state.f).some(v => v && v.length) || state.q || state.patch;
+    document.getElementById("clearAll").hidden = !active;
+    document.getElementById("empty").hidden = list.length > 0;
+
+    const grid = document.getElementById("gridView"), table = document.getElementById("tableView");
+    grid.hidden = state.view !== "tickets" || !list.length;
+    table.hidden = state.view !== "table" || !list.length;
+
+    if (state.view === "tickets") {
+      grid.innerHTML = list.map(t => UI.ticketCard(t)).join("");
+      UI.notchAll(grid);
+    } else {
+      document.getElementById("rows").innerHTML = list.map(t => {
+        const u = UI.user(t.assignee);
+        return '<tr tabindex="0" data-href="ticket.html?id=' + t.id + '">' +
+          '<td><span class="id-chip p-' + t.priority + '">TKT-' + t.id + "</span></td>" +
+          '<td><div class="t-title' + (t.ar ? " ar" : "") + '" dir="auto" title="' + UI.esc(t.title) + '">' + UI.esc(t.title) + "</div></td>" +
+          "<td>" + UI.statusBadge(t) + "</td>" +
+          "<td>" + UI.prioBadge(t.priority) + "</td>" +
+          '<td><span class="cell-flex">' + UI.icon("box", "xs") + t.module + "</span></td>" +
+          '<td><span class="cell-flex">' + UI.typeLabel(t.type) + "</span></td>" +
+          '<td><span class="tag ' + (t.env === "prod" ? "env-prod" : "env-test") + '">' + D.envs[t.env] + "</span></td>" +
+          "<td>" + UI.person(t.assignee, { size: "xs" }) + "</td>" +
+          '<td class="num" style="color:var(--text-2)">' + UI.fmtDate(t.created, true) + "</td></tr>";
+      }).join("");
+    }
+    // chip states
+    document.querySelectorAll("[data-filter]").forEach(ch => {
+      const k = ch.dataset.filter, sel = state.f[k] || [];
+      ch.classList.toggle("on", sel.length > 0);
+      const def = FILTERS[k];
+      let label = def.label;
+      if (sel.length === 1) label = def.label + ': <span class="val">' + (def.opts.find(o => o[0] === sel[0]) || [, sel[0]])[1] + "</span>";
+      else if (sel.length > 1) label = def.label + ' <span class="n">' + sel.length + "</span>";
+      ch.innerHTML = (k === "date" ? UI.icon("calendar", "xs") : "") + label + UI.icon("chevDown", "xs");
+    });
+  }
+
+  /* View switch */
+  document.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click", () => {
+    state.view = b.dataset.view;
+    try { localStorage.setItem("pits-view", state.view); } catch (e) {}
+    document.querySelectorAll("[data-view]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+    render();
+  }));
+  document.querySelectorAll("[data-view]").forEach(x => x.setAttribute("aria-pressed", String(x.dataset.view === state.view)));
+
+  document.getElementById("q").addEventListener("input", e => { state.q = e.target.value.trim(); render(); });
+  document.getElementById("sort").addEventListener("change", e => { state.sort = e.target.value; render(); });
+  document.getElementById("hasPatch").addEventListener("change", e => { state.patch = e.target.checked; render(); });
+  document.getElementById("advBtn").addEventListener("click", function () {
+    const row = document.getElementById("advRow");
+    row.classList.toggle("open");
+    this.setAttribute("aria-expanded", row.classList.contains("open"));
+  });
+  function clearAll() { state.f = {}; state.q = ""; state.patch = false; document.getElementById("q").value = ""; document.getElementById("hasPatch").checked = false; render(); }
+  document.getElementById("clearAll").addEventListener("click", clearAll);
+  document.getElementById("emptyClear").addEventListener("click", clearAll);
+
+  /* Table interactions */
+  document.getElementById("rows").addEventListener("click", e => { const tr = e.target.closest("tr"); if (tr) location.href = tr.dataset.href; });
+  document.getElementById("rows").addEventListener("keydown", e => { if (e.key === "Enter") { const tr = e.target.closest("tr"); if (tr) location.href = tr.dataset.href; } });
+  document.querySelectorAll("th [data-sort]").forEach(b => b.addEventListener("click", () => {
+    const m = { id: "new", created: state.sort === "new" ? "old" : "new", prio: "prio" };
+    state.sort = m[b.dataset.sort]; document.getElementById("sort").value = state.sort; render();
+  }));
+
+  /* Filter popover */
+  const pop = document.getElementById("pop");
+  let openKey = null;
+  function counts(k) {
+    const c = {};
+    D.tickets.forEach(t => { const v = FILTERS[k].get(t); c[v] = (c[v] || 0) + 1; });
+    return c;
+  }
+  function openPop(chip) {
+    const k = chip.dataset.filter, def = FILTERS[k], sel = state.f[k] || [], c = counts(k);
+    openKey = k;
+    pop.innerHTML =
+      (def.search ? '<div class="pop-search">' + UI.icon("search", "sm") + '<input placeholder="Find a person" aria-label="Find option"></div>' : "") +
+      '<div class="pop-list">' + def.opts.map(([v, l]) =>
+        '<label class="opt-row" data-label="' + l.toLowerCase() + '"><input class="checkbox" type="' + (def.single ? "radio" : "checkbox") + '" name="pf" value="' + v + '"' + (sel.includes(v) ? " checked" : "") + ">" +
+        (k === "status" ? UI.statusBadgeKey(v) : k === "priority" ? UI.prioBadge(v) : ["assignee", "creator", "reviewer", "tester"].includes(k) && v !== "none" ? UI.person(v, { size: "xs" }) : "<span>" + l + "</span>") +
+        (k !== "date" ? '<span class="cnt">' + (c[v] || 0) + "</span>" : "") + "</label>").join("") + "</div>" +
+      '<div class="pop-foot"><button class="clear-link" type="button" data-act="clear">Clear</button><button class="btn sm navy" type="button" data-act="done">Done</button></div>';
+    const r = chip.getBoundingClientRect();
+    pop.classList.add("open");
+    const w = pop.offsetWidth;
+    let left = document.documentElement.dir === "rtl" ? r.right - w : r.left;
+    left = Math.max(12, Math.min(left, innerWidth - w - 12));
+    pop.style.left = left + "px";
+    pop.style.top = Math.min(r.bottom + 6, innerHeight - pop.offsetHeight - 12) + "px";
+    const s = pop.querySelector(".pop-search input");
+    if (s) { s.focus(); s.addEventListener("input", () => pop.querySelectorAll(".opt-row").forEach(o => o.hidden = !o.dataset.label.includes(s.value.toLowerCase()))); }
+    else { const f = pop.querySelector("input"); if (f) f.focus(); }
+  }
+  function closePop() { pop.classList.remove("open"); openKey = null; }
+  pop.addEventListener("change", () => {
+    state.f[openKey] = Array.from(pop.querySelectorAll("input[name=pf]:checked")).map(i => i.value);
+    render();
+  });
+  pop.addEventListener("click", e => {
+    const a = e.target.closest("[data-act]");
+    if (!a) return;
+    if (a.dataset.act === "clear") { state.f[openKey] = []; pop.querySelectorAll("input[name=pf]").forEach(i => i.checked = false); render(); }
+    else closePop();
+  });
+  document.addEventListener("click", e => {
+    const chip = e.target.closest("[data-filter]");
+    if (chip) { e.stopPropagation(); if (openKey === chip.dataset.filter) closePop(); else openPop(chip); return; }
+    if (!e.target.closest("#pop")) closePop();
+  });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closePop(); });
+  window.addEventListener("scroll", closePop, { passive: true });
+
+  render();
+})();
+</script>
+</body>
+</html>

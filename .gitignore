@@ -1,0 +1,24 @@
+# Build output
+backend/target/
+frontend/.next/
+frontend/tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# Dependencies and local runtimes (copied from Orbit; not versioned)
+frontend/node_modules/
+.tools/
+
+# Local runtime state — logs can contain the first admin's temporary password
+backend/logs/
+backend/.tmp/
+*.log
+
+# Secrets
+.env*
+backend/.local-jwt-secret
+
+# OS / editor noise
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/
