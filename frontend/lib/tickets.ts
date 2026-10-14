@@ -88,6 +88,39 @@ export interface TicketDetail {
   blockedAt: string | null;
   /** Workflow actions the current user can take now (server-computed). */
   actions: WorkflowAction[];
+  commentCount: number;
+  attachmentCount: number;
+  canComment: boolean;
+  canUpload: boolean;
+  /** Test evidence: only the assigned tester, while the ticket is in testing. */
+  canUploadEvidence: boolean;
+}
+
+export type AttachmentPurpose = "GENERAL" | "COMMENT" | "EVIDENCE";
+
+export interface AttachmentView {
+  id: number;
+  fileName: string;
+  contentType: string;
+  size: number;
+  purpose: AttachmentPurpose;
+  commentId: number | null;
+  uploadedBy: PersonRef;
+  uploadedAt: string;
+  image: boolean;
+  can: { delete: boolean };
+}
+
+export interface CommentView {
+  id: number;
+  author: PersonRef;
+  /** Empty when the comment was deleted. */
+  body: string;
+  createdAt: string;
+  editedAt: string | null;
+  deleted: boolean;
+  attachments: AttachmentView[];
+  can: { edit: boolean; delete: boolean };
 }
 
 export interface DirectoryEntry { id: number; fullName: string; organization: string; avatarColor: string | null; roles: string[] }
@@ -194,7 +227,60 @@ export const WORKFLOW_ACTIVITY: Record<string, string> = {
   CANCELLED: "cancelled the ticket",
   CLOSED_UNRESOLVED: "closed the ticket as unresolved",
   CONTRIBUTORS_CHANGED: "updated the code contributors",
+  COMMENT_ADDED: "added a comment",
+  COMMENT_EDITED: "edited a comment",
+  COMMENT_DELETED: "deleted a comment",
+  ATTACHMENT_ADDED: "added an attachment",
+  ATTACHMENT_DELETED: "removed an attachment",
 };
+
+/* ---- Files ---- */
+
+/** Mirrors the server's rules so mistakes are caught before an upload; the server still enforces them. */
+export const ALLOWED_EXT = ["png", "jpg", "jpeg", "gif", "webp", "pdf", "xls", "xlsx", "csv", "txt", "log", "sql"];
+export const MAX_FILE_MB = 20;
+export const MAX_FILES = 10;
+export const ACCEPT = ALLOWED_EXT.map((e) => "." + e).join(",");
+export const FILE_HINT = `PNG, JPG, GIF, WebP, PDF, Excel, CSV, TXT, LOG or SQL · up to ${MAX_FILE_MB} MB each`;
+
+export function fmtSize(bytes: number) {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(bytes < 10240 ? 1 : 0) + " KB";
+  return (bytes / 1024 / 1024).toFixed(1) + " MB";
+}
+
+export function fileExt(name: string) {
+  const i = name.lastIndexOf(".");
+  return i < 0 ? "" : name.slice(i + 1).toLowerCase();
+}
+
+export type FileKind = "image" | "pdf" | "sheet" | "text" | "other";
+export function fileKind(name: string): FileKind {
+  const e = fileExt(name);
+  if (["png", "jpg", "jpeg", "gif", "webp"].includes(e)) return "image";
+  if (e === "pdf") return "pdf";
+  if (["xls", "xlsx", "csv"].includes(e)) return "sheet";
+  if (["txt", "log", "sql"].includes(e)) return "text";
+  return "other";
+}
+
+/** Splits chosen files into the ones that can be sent and friendly reasons for the ones that can't. */
+export function checkFiles(incoming: File[], alreadyStaged: number): { ok: File[]; errors: string[] } {
+  const ok: File[] = [];
+  const errors: string[] = [];
+  for (const f of incoming) {
+    if (!ALLOWED_EXT.includes(fileExt(f.name))) errors.push(`"${f.name}" isn't an allowed file type.`);
+    else if (f.size === 0) errors.push(`"${f.name}" is empty.`);
+    else if (f.size > MAX_FILE_MB * 1024 * 1024) errors.push(`"${f.name}" is ${fmtSize(f.size)}; the limit is ${MAX_FILE_MB} MB per file.`);
+    else if (alreadyStaged + ok.length >= MAX_FILES) errors.push(`You can attach up to ${MAX_FILES} files at a time.`);
+    else ok.push(f);
+  }
+  return { ok, errors: [...new Set(errors)] };
+}
+
+export function attachmentUrl(id: number, inline = false) {
+  return `/api/attachments/${id}${inline ? "?inline=1" : ""}`;
+}
 
 /** "1004", "#1004" or "TKT-1004" → 1004, else null. */
 export function parseTicketNo(text: string): number | null {

@@ -7,13 +7,15 @@ export class ApiError extends Error {
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  // FormData goes out as-is: the browser sets the multipart Content-Type (and its boundary).
+  const isForm = typeof FormData !== "undefined" && body instanceof FormData;
   let res: Response;
   try {
     res = await fetch(path, {
       method,
       credentials: "same-origin",
-      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      headers: body === undefined || isForm ? undefined : { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
       cache: "no-store",
     });
   } catch {
@@ -47,6 +49,8 @@ export const api = {
   post: <T>(path: string, body?: unknown) => request<T>("POST", path, body ?? {}),
   put: <T>(path: string, body?: unknown) => request<T>("PUT", path, body ?? {}),
   del: <T>(path: string) => request<T>("DELETE", path),
+  /** Multipart upload (files and fields in one FormData). */
+  upload: <T>(path: string, form: FormData) => request<T>("POST", path, form),
 };
 
 /* ---- Shared API types ---- */

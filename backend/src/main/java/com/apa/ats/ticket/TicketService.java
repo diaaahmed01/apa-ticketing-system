@@ -52,6 +52,8 @@ public class TicketService {
     private final ReferenceCache cache;
     private final AccessGuard guard;
     private final WorkflowActions workflowActions;
+    private final DiscussionRecords.Comments comments;
+    private final DiscussionRecords.Attachments attachments;
 
     /* ------------------------------------------------------------------ inputs */
 
@@ -363,7 +365,11 @@ public class TicketService {
                 t.getPatchReference(), l.person(t.getClosedBy()), t.getClosedAt(), linkViews, acts,
                 rel.stream().map(Enum::name).sorted().toList(), can, t.getVersion(), t.getUpdatedAt(),
                 t.getTestResult(), t.getBlockReason(), t.getBlockPatch(), l.person(t.getBlockedBy()), t.getBlockedAt(),
-                workflowActions.of(t, ps, rel, me));
+                workflowActions.of(t, ps, rel, me),
+                comments.countByTicketIdAndDeletedAtIsNull(t.getId()), attachments.countByTicketIdAndDeletedAtIsNull(t.getId()),
+                open && guard.allows(me, "COMMENT_ADD", rel),
+                open && guard.allows(me, "ATTACH_UPLOAD", rel),
+                open && t.getStatus() == Status.TESTING && guard.allows(me, "TEST_UPLOAD_EVIDENCE", rel));
     }
 
     private static List<PersonRef> persons(List<TicketPerson> ps, PersonKind kind, Lookup l) {

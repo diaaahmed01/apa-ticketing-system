@@ -9,6 +9,8 @@ const nextConfig = {
   turbopack: { root: __dirname },
   output: "standalone",
   poweredByHeader: false,
+  // Attachment uploads (up to 20 MB a file, several files) pass through this server on their way to the API.
+  experimental: { middlewareClientMaxBodySize: "100mb" },
   async rewrites() {
     // The browser only ever talks to this origin, so the SameSite=Strict
     // session cookie set by the backend travels with every API call.

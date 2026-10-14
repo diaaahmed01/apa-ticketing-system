@@ -4,12 +4,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
+import { AttachButton, StagedList, useStagedFiles } from "./FileBits";
 import { Avatar, Icon } from "./Icon";
 import { Modal } from "./Modal";
 import { toast } from "./Toast";
 import { UserPicker } from "./UserPicker";
 import {
-  ACTION_LABEL, CLOSURE_LABEL, PRIMARY_ACTIONS, fmtDate, parseTicketNo, ticketNo,
+  ACTION_LABEL, CLOSURE_LABEL, FILE_HINT, PRIMARY_ACTIONS, fmtDate, parseTicketNo, ticketNo,
   type DirectoryEntry, type TicketDetail, type WorkflowAction,
 } from "@/lib/tickets";
 
@@ -108,8 +109,26 @@ export function WorkflowPanel({ t, people, onUpdated, onStale }: {
         yesHint="Moves to Testing" noHint="Back to In Progress" reasonLabel="What needs to change?"
         onSubmit={(pos, reason) => run("review", { decision: pos ? "APPROVE" : "REJECT", reason }, pos ? "Review approved" : "Review rejected")} />}
       {open === "test-result" && <DecisionForm {...shell} title="Record test result" yes="Pass" no="Fail"
-        yesHint="Stays in Testing" noHint="Back to In Progress" reasonLabel="What failed?"
-        onSubmit={(pos, reason) => run("test-result", { result: pos ? "PASS" : "FAIL", reason }, pos ? "Testing passed" : "Testing failed")} />}
+        yesHint="Stays in Testing" noHint="Back to In Progress" reasonLabel="What failed?" evidence={t.canUploadEvidence}
+        onSubmit={async (pos, reason, files) => {
+          if (files.length > 0) {
+            // Evidence goes up first, so a failed upload doesn't leave a result with nothing behind it.
+            setBusy(true);
+            setError(null);
+            try {
+              const fd = new FormData();
+              fd.append("purpose", "EVIDENCE");
+              files.forEach((f) => fd.append("files", f));
+              await api.upload(`/api/tickets/${t.id}/attachments`, fd);
+            } catch (e) {
+              setError(e instanceof ApiError ? e.message : "The evidence couldn't be uploaded. Try again.");
+              setBusy(false);
+              return;
+            }
+            setBusy(false);
+          }
+          await run("test-result", { result: pos ? "PASS" : "FAIL", reason }, pos ? "Testing passed" : "Testing failed");
+        }} />}
       {open === "mark-deployed" && <DeployForm t={t} run={run} {...shell} />}
       {open === "verify" && <VerifyForm t={t} run={run} {...shell} />}
       {open === "block" && <BlockForm run={run} {...shell} />}
@@ -293,18 +312,32 @@ function Choice({ yes, no, yesHint, noHint, value, onChange }: {
   );
 }
 
-function DecisionForm({ title, yes, no, yesHint, noHint, reasonLabel, onSubmit, ...shell }: ShellProps & {
+function DecisionForm({ title, yes, no, yesHint, noHint, reasonLabel, evidence, onSubmit, ...shell }: ShellProps & {
   title: string; yes: string; no: string; yesHint: string; noHint: string; reasonLabel: string;
-  onSubmit: (positive: boolean, reason: string) => void;
+  /** Offer an optional evidence file picker (test results). */
+  evidence?: boolean;
+  onSubmit: (positive: boolean, reason: string, files: File[]) => void;
 }) {
   const [pos, setPos] = useState<boolean | null>(null);
   const [reason, setReason] = useState("");
+  const staged = useStagedFiles();
   return (
     <Shell {...shell} title={title} submit={pos === false ? no : yes}
-      danger={pos === false} canSubmit={pos !== null && (pos || reason.trim().length > 0)} onSubmit={() => onSubmit(pos as boolean, reason.trim())}>
+      danger={pos === false} canSubmit={pos !== null && (pos || reason.trim().length > 0)} onSubmit={() => onSubmit(pos as boolean, reason.trim(), staged.files)}>
       <Choice yes={yes} no={no} yesHint={yesHint} noHint={noHint} value={pos} onChange={setPos} />
       {pos !== null && (
         <ReasonField id="wf-reason" label={pos ? "Note" : reasonLabel} value={reason} onChange={setReason} required={!pos} />
+      )}
+      {evidence && pos !== null && (
+        <div className="field">
+          <span className="field-label">Evidence<span className="opt">(optional)</span></span>
+          <StagedList files={staged.files} onRemove={staged.remove} disabled={shell.busy} />
+          <div className="evidence-pick">
+            <AttachButton onFiles={staged.add} disabled={shell.busy} label="Add screenshots or logs" ghost={false} />
+            <span className="hint">{FILE_HINT}</span>
+          </div>
+          {staged.problem && <p className="err" role="alert">{staged.problem}</p>}
+        </div>
       )}
     </Shell>
   );

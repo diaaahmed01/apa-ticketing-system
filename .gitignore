@@ -23,3 +23,6 @@ Thumbs.db
 .vscode/
 .idea/
 backend/.local-test-users
+
+# Attachment files (ats.attachments.dir default)
+backend/data/

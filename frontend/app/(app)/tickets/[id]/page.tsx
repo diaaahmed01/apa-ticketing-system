@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, ApiError, type ModuleView } from "@/lib/api";
+import { AttachmentsTab, CommentsTab } from "@/components/Discussion";
 import { Avatar, Icon } from "@/components/Icon";
 import { Modal } from "@/components/Modal";
 import { Perf, TicketPaper } from "@/components/TicketPaper";
@@ -16,7 +17,7 @@ import {
   type ActivityView, type DirectoryEntry, type Environment, type PersonRef, type Priority, type Status, type TicketDetail, type TicketType,
 } from "@/lib/tickets";
 
-type Tab = "overview" | "related" | "activity";
+type Tab = "overview" | "comments" | "attachments" | "related" | "activity";
 type RoleKey = "assignee" | "reviewer" | "tester";
 
 export default function TicketDetailPage() {
@@ -24,6 +25,8 @@ export default function TicketDetailPage() {
   const [t, setT] = useState<TicketDetail | null>(null);
   const [error, setError] = useState<{ code: string; message: string } | null>(null);
   const [tab, setTab] = useState<Tab>("overview");
+  // Comments and attachments stay mounted once opened, so a half-written comment survives switching tabs.
+  const [seen, setSeen] = useState<Set<Tab>>(() => new Set<Tab>(["overview"]));
   const [people, setPeople] = useState<DirectoryEntry[]>([]);
   const [editing, setEditing] = useState(false);
   const [assigning, setAssigning] = useState<RoleKey | null>(null);
@@ -39,6 +42,20 @@ export default function TicketDetailPage() {
   }, [id]);
   useEffect(() => { load(); }, [load]);
   useEffect(() => { api.get<DirectoryEntry[]>("/api/users/directory").then(setPeople).catch(() => {}); }, []);
+
+  function openTab(k: Tab) {
+    setTab(k);
+    setSeen((cur) => (cur.has(k) ? cur : new Set(cur).add(k)));
+  }
+
+  function showComment(id: number) {
+    openTab("comments");
+    setTimeout(() => {
+      const el = document.getElementById(`comment-${id}`);
+      el?.scrollIntoView({ block: "center", behavior: "smooth" });
+      el?.focus({ preventScroll: true });
+    }, 80);
+  }
 
   async function act(p: Promise<TicketDetail>, ok: string) {
     try {
@@ -175,12 +192,11 @@ export default function TicketDetailPage() {
       </TicketPaper>
 
       <div className="tabs" role="tablist" aria-label="Ticket sections">
-        {([["overview", "Overview", null], ["related", "Related tickets", t.links.length], ["activity", "Activity", t.activity.length]] as [Tab, string, number | null][]).map(([k, label, n]) => (
-          <button key={k} type="button" role="tab" aria-selected={tab === k} className="tab" onClick={() => setTab(k)}>
+        {([["overview", "Overview", null], ["comments", "Comments", t.commentCount], ["attachments", "Attachments", t.attachmentCount], ["related", "Related tickets", t.links.length], ["activity", "Activity", t.activity.length]] as [Tab, string, number | null][]).map(([k, label, n]) => (
+          <button key={k} type="button" role="tab" aria-selected={tab === k} className="tab" onClick={() => openTab(k)}>
             {label}{n ? <span className="tab-n">{n}</span> : null}
           </button>
         ))}
-        <span className="tabs-later" title="Comments and attachments come in a later phase">Comments and attachments arrive next</span>
       </div>
 
       {tab === "overview" && (
@@ -196,6 +212,8 @@ export default function TicketDetailPage() {
         </section>
       )}
 
+      {seen.has("comments") && <div hidden={tab !== "comments"}><CommentsTab t={t} onChanged={load} /></div>}
+      {seen.has("attachments") && <div hidden={tab !== "attachments"}><AttachmentsTab t={t} onChanged={load} onShowComment={showComment} /></div>}
       {tab === "related" && <RelatedTab t={t} onChange={(p, ok) => act(p, ok)} />}
       {tab === "activity" && <ActivityTab items={t.activity} />}
 
@@ -337,6 +355,11 @@ function describe(a: ActivityView): React.ReactNode {
     case "TESTER_CHANGED": return a.newValue ? <>made <b dir="auto">{a.newValue}</b> the tester</> : <>cleared the tester</>;
     case "COLLABORATOR_ADDED": return <>added <b dir="auto">{a.newValue}</b> as a collaborator</>;
     case "COLLABORATOR_REMOVED": return <>removed collaborator <b dir="auto">{a.oldValue}</b></>;
+    case "COMMENT_ADDED": return <>added a comment</>;
+    case "COMMENT_EDITED": return <>edited a comment</>;
+    case "COMMENT_DELETED": return <>deleted a comment</>;
+    case "ATTACHMENT_ADDED": return <>{a.note === "Test evidence" ? "added test evidence" : "attached"} <b dir="auto"><bdi>{a.newValue}</bdi></b></>;
+    case "ATTACHMENT_DELETED": return <>removed the attachment <b dir="auto"><bdi>{a.oldValue}</bdi></b></>;
     case "LINK_ADDED": return <>linked <b>{a.newValue}</b></>;
     case "LINK_REMOVED": return <>unlinked <b>{a.oldValue}</b></>;
     case "STATUS_CHANGED": return <>moved it from <b>{v(a.oldValue)}</b> to <b>{v(a.newValue)}</b></>;
@@ -363,7 +386,7 @@ function ActivityTab({ items }: { items: ActivityView[] }) {
             <span className="tl-dot" />
             <div className="tl-body">
               <span className="tl-text"><b dir="auto">{a.actor.fullName}</b> {describe(a)}</span>
-              {a.note && <p className="tl-note" dir="auto">{a.note}</p>}
+              {a.note && a.action !== "ATTACHMENT_ADDED" && <p className="tl-note" dir="auto">{a.note}</p>}
             </div>
             <time className="tl-time num" dateTime={a.at} title={fmtDate(a.at, true)}>{relTime(a.at)}</time>
           </li>

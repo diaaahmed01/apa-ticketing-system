@@ -1,6 +1,8 @@
 package com.apa.ats.common;
 
+import com.apa.ats.config.AtsProperties;
 import java.util.Map;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -10,8 +12,11 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @Slf4j
+@RequiredArgsConstructor
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private final AtsProperties props;
 
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<Map<String, String>> api(ApiException e) {
@@ -40,6 +45,17 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> unreadable(HttpMessageNotReadableException e) {
         return ResponseEntity.badRequest()
                 .body(Map.of("error", "BAD_REQUEST", "message", "The request body is missing or malformed."));
+    }
+
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<Map<String, String>> tooLarge(Exception e) {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(Map.of("error", "FILE_TOO_LARGE",
+                "message", "That upload is too large. Each file can be up to " + props.attachments().maxMb() + " MB."));
+    }
+
+    @ExceptionHandler(org.springframework.web.multipart.MultipartException.class)
+    public ResponseEntity<Map<String, String>> badUpload(Exception e) {
+        return ResponseEntity.badRequest().body(Map.of("error", "BAD_UPLOAD", "message", "The upload couldn't be read. Try attaching the files again."));
     }
 
     @ExceptionHandler(Exception.class)

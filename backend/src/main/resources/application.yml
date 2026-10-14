@@ -1,6 +1,9 @@
 server:
   port: ${ATS_PORT:8095}   # Orbit uses 8090; 8080 is SPS GlassFish.
   shutdown: graceful
+  tomcat:
+    # Read the rest of an oversized upload so the client gets the 413 instead of a dropped connection.
+    max-swallow-size: -1
 
 spring:
   application:
@@ -15,6 +18,11 @@ spring:
     hikari:
       pool-name: ats-pool
       maximum-pool-size: 10
+  servlet:
+    multipart:
+      # Same limit as ats.attachments.max-mb; the request limit covers up to 10 files in one go.
+      max-file-size: ${ATS_ATTACHMENTS_MAX_MB:20}MB
+      max-request-size: ${ATS_ATTACHMENTS_MAX_REQUEST_MB:100}MB
   jpa:
     open-in-view: false
     hibernate:
@@ -48,3 +56,6 @@ ats:
     initial-password: ${ATS_ADMIN_INITIAL_PASSWORD:}
   cors:
     allowed-origins: ${ATS_CORS_ORIGINS:http://localhost:3010}
+  attachments:
+    dir: ${ATS_ATTACHMENTS_DIR:./data/attachments}
+    max-mb: ${ATS_ATTACHMENTS_MAX_MB:20}
