@@ -88,3 +88,11 @@ export interface UserView {
 export interface IssuedView { user: UserView; temporaryPassword: string }
 
 export interface ModuleView { id: number; name: string; nameAr: string | null; active: boolean; sortOrder: number }
+
+export interface PermRole { id: number; code: string; name: string; nameAr: string | null; description: string | null; system: boolean; activeUsers: number }
+export interface PermDef { code: string; category: string; name: string; description: string | null; allowedConditions: string[] }
+export interface PermGrant { role: string; permission: string; condition: string }
+export interface PermCondition { code: string; label: string }
+export interface PermMatrix { roles: PermRole[]; permissions: PermDef[]; grants: PermGrant[]; conditions: PermCondition[] }
+export interface PermChange { role: string; permission: string; condition: string; action: "GRANT" | "REVOKE" }
+export interface PermChangeResult { changeSetId: string; applied: number; matrix: PermMatrix }

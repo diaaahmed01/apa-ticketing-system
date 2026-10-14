@@ -941,3 +941,61 @@ section.tab-panel:not(.panel) { padding: 0; }
   .wf-banner > .btn { width: 100%; }
   .choice-pair { grid-template-columns: 1fr; }
 }
+
+/* ---- Roles & permissions matrix ---- */
+.perm-page { padding-bottom: 96px; }
+.perm-legend { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 0 0 12px; padding: 0; list-style: none; font-size: 12.5px; color: var(--text-2); }
+.perm-legend li { display: flex; align-items: center; gap: 8px; }
+.perm-scroll { background: #fff; border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow-1); overflow: auto; max-height: calc(100vh - 290px); min-height: 240px; max-width: 100%; }
+.perm-matrix { border-collapse: separate; border-spacing: 0; width: 100%; min-width: max-content; }
+.perm-matrix th, .perm-matrix td { border-bottom: 1px solid var(--line); padding: 0; background: #fff; }
+.perm-matrix thead th { position: sticky; top: 0; z-index: 3; background: var(--surface-2); padding: 10px 12px; text-align: center; vertical-align: bottom; min-width: 124px; }
+.perm-matrix thead th.perm-corner { inset-inline-start: 0; z-index: 5; text-align: start; min-width: 280px; max-width: 340px; font-size: 11.5px; font-weight: 600; color: var(--muted-2); letter-spacing: .04em; text-transform: uppercase; border-inline-end: 1px solid var(--line); }
+.perm-role-name { display: block; font-size: 13px; font-weight: 650; color: var(--navy); white-space: nowrap; }
+.perm-role-meta { display: block; margin-top: 1px; font-size: 11.5px; font-weight: 500; color: var(--muted); }
+.perm-matrix tbody th.perm-name { position: sticky; inset-inline-start: 0; z-index: 2; text-align: start; font-weight: 400; padding: 10px 14px; min-width: 280px; max-width: 340px; border-inline-end: 1px solid var(--line); }
+.perm-name b { display: block; font-size: 13px; font-weight: 600; color: var(--navy); }
+.perm-name span { display: block; margin-top: 2px; font-size: 12px; line-height: 1.4; color: var(--muted-2); }
+.perm-matrix tr.perm-group th { position: static; background: var(--navy-wash); padding: 7px 14px; text-align: start; font-size: 11.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--navy); }
+.perm-group th span { position: sticky; inset-inline-start: 14px; }
+.perm-matrix td.perm-empty { padding: 36px 16px; text-align: center; color: var(--text-2); font-size: 13.5px; }
+.perm-matrix tbody tr:last-child > * { border-bottom: 0; }
+.perm-cell { position: relative; text-align: center; }
+.perm-matrix td.perm-cell.changed { background: var(--blue-wash); }
+.perm-btn { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; min-height: 52px; padding: 8px 10px; border: 0; background: transparent; font: inherit; cursor: pointer; transition: background .15s; }
+.perm-btn:hover { background: rgba(40,120,227,.07); }
+.perm-btn:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+.perm-none { color: var(--perf); font-weight: 600; font-size: 15px; line-height: 1; }
+.perm-always { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding-inline: 8px 10px; border-radius: 12px; background: var(--blue); color: #fff; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.perm-always .icon { color: #fff; }
+.perm-chips { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
+.perm-chip { display: inline-block; padding: 2px 8px; border-radius: 6px; background: var(--cyan); color: var(--blue-ink); border: 1px solid rgba(40,120,227,.22); font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+.perm-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 0 2px #fff; flex: none; display: inline-block; }
+.perm-btn .perm-dot { position: absolute; top: 6px; inset-inline-end: 6px; }
+
+.perm-pop { position: fixed; z-index: 80; width: 250px; padding: 8px; background: #fff; border-radius: 12px; box-shadow: var(--shadow-pop), 0 0 0 1px rgba(20,40,63,.06); animation: pop .16s var(--ease); }
+.perm-pop-title { margin: 2px 6px 6px; font-size: 12px; font-weight: 600; color: var(--muted-2); }
+.perm-opt { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 8px; font-size: 13px; font-weight: 500; color: var(--navy); cursor: pointer; }
+.perm-opt:hover { background: var(--navy-wash); }
+.perm-opt input[type="radio"] { accent-color: var(--blue); width: 16px; height: 16px; margin: 0; flex: none; }
+.perm-conds { margin: 0 0 4px; margin-inline-start: 26px; padding-inline-start: 6px; border-inline-start: 2px solid var(--line); }
+.perm-opt.sub { padding: 6px 8px; }
+.perm-hint { margin: 2px 8px 4px; font-size: 12px; color: var(--st-testing); }
+
+.perm-bar { position: fixed; z-index: 40; inset-inline: 0; bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 28px; background: #fff; border-top: 1px solid var(--line-2); box-shadow: 0 -6px 20px rgba(20,40,63,.08); }
+.perm-bar-count { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--navy); }
+.perm-bar-actions { display: flex; gap: 8px; }
+
+.perm-review { display: flex; flex-direction: column; gap: 16px; }
+.perm-review h4 { margin: 0 0 6px; font-size: 13px; font-weight: 700; color: var(--navy); }
+.perm-review ul { margin: 0; padding-inline-start: 18px; display: flex; flex-direction: column; gap: 5px; font-size: 13px; line-height: 1.5; color: var(--text); }
+.perm-was { color: var(--muted-2); }
+
+@media (max-width: 720px) {
+  .perm-page { padding-inline: 16px; }
+  .perm-scroll { max-height: calc(100vh - 340px); }
+  .perm-matrix thead th.perm-corner, .perm-matrix tbody th.perm-name { min-width: 180px; max-width: 200px; }
+  .perm-bar { padding: 10px 16px; }
+  .perm-bar-actions { width: 100%; }
+  .perm-bar-actions .btn.primary { flex: 1; }
+}

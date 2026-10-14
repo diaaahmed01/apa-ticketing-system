@@ -19,7 +19,7 @@ const MAIN: NavItem[] = [
 
 const ADMIN: NavItem[] = [
   { href: "/admin/users", label: "User Management", icon: "users", permission: "USER_VIEW" },
-  { href: "/admin/permissions", label: "Roles & Permissions", icon: "shield", permission: "ROLE_PERMISSION_MANAGE", soon: true },
+  { href: "/admin/permissions", label: "Roles & Permissions", icon: "shield", permission: "ROLE_PERMISSION_MANAGE" },
   { href: "/admin/modules", label: "Module Management", icon: "layers", permission: "MODULE_MANAGE" },
   { href: "/admin/settings", label: "Settings", icon: "settings", permission: "SETTINGS_MANAGE", soon: true },
 ];
