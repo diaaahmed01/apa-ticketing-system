@@ -51,6 +51,7 @@ public class TicketService {
     private final TicketRecords.Activities activities;
     private final ReferenceCache cache;
     private final AccessGuard guard;
+    private final WorkflowActions workflowActions;
 
     /* ------------------------------------------------------------------ inputs */
 
@@ -322,7 +323,7 @@ public class TicketService {
         return rel;
     }
 
-    private Detail toDetail(Ticket t, Lookup l) {
+    Detail toDetail(Ticket t, Lookup l) {
         CurrentUser me = CurrentUser.require();
         List<TicketPerson> ps = people.findByTicketId(t.getId());
         Set<Condition> rel = relationships(t, ps, me.id());
@@ -360,7 +361,9 @@ public class TicketService {
                 l.person(t.getReviewerId()), l.person(t.getTesterId()),
                 persons(ps, PersonKind.COLLABORATOR, l), persons(ps, PersonKind.CONTRIBUTOR, l),
                 t.getPatchReference(), l.person(t.getClosedBy()), t.getClosedAt(), linkViews, acts,
-                rel.stream().map(Enum::name).sorted().toList(), can, t.getVersion(), t.getUpdatedAt());
+                rel.stream().map(Enum::name).sorted().toList(), can, t.getVersion(), t.getUpdatedAt(),
+                t.getTestResult(), t.getBlockReason(), t.getBlockPatch(), l.person(t.getBlockedBy()), t.getBlockedAt(),
+                workflowActions.of(t, ps, rel, me));
     }
 
     private static List<PersonRef> persons(List<TicketPerson> ps, PersonKind kind, Lookup l) {
@@ -369,7 +372,7 @@ public class TicketService {
                 .map(p -> l.person(p.getUserId())).toList();
     }
 
-    private void linkRelated(Ticket t, Long otherId, Long actor, Instant now) {
+    void linkRelated(Ticket t, Long otherId, Long actor, Instant now) {
         if (otherId.equals(t.getId())) throw ApiException.badRequest("SELF_LINK", "A ticket can't be related to itself.");
         if (!tickets.existsById(otherId)) throw ApiException.badRequest("UNKNOWN_TICKET", "TKT-" + otherId + " doesn't exist.");
         if (links.existsById(new TicketLink.Key(t.getId(), otherId, LinkType.RELATED))
@@ -385,7 +388,7 @@ public class TicketService {
         log(otherId, actor, "LINK_ADDED", "related", null, "TKT-" + t.getId(), null);
     }
 
-    private void addPerson(Long ticketId, Long userId, PersonKind kind, Long actor, Instant now) {
+    void addPerson(Long ticketId, Long userId, PersonKind kind, Long actor, Instant now) {
         TicketPerson p = new TicketPerson();
         p.setTicketId(ticketId);
         p.setUserId(userId);
@@ -408,28 +411,28 @@ public class TicketService {
         activities.save(a);
     }
 
-    private Lookup lookup() {
+    Lookup lookup() {
         ReferenceCache.Snapshot s = cache.get();
         return new Lookup(s.users(), s.modules());
     }
 
-    private Ticket load(Long id) {
+    Ticket load(Long id) {
         return tickets.findById(id).orElseThrow(() -> ApiException.notFound("TKT-" + id));
     }
 
-    private Ticket loadOpen(Long id) {
+    Ticket loadOpen(Long id) {
         Ticket t = load(id);
         if (t.isClosed()) throw ApiException.conflict("TICKET_CLOSED", "TKT-" + id + " is closed and can no longer be changed.");
         return t;
     }
 
-    private static void checkVersion(Ticket t, Integer version) {
+    static void checkVersion(Ticket t, Integer version) {
         if (version != null && version != t.getVersion()) {
             throw new ObjectOptimisticLockingFailureException(Ticket.class, t.getId());
         }
     }
 
-    private static void touch(Ticket t, Long actor) {
+    static void touch(Ticket t, Long actor) {
         t.setUpdatedAt(Instant.now());
         t.setUpdatedBy(actor);
     }
@@ -441,7 +444,7 @@ public class TicketService {
         return m;
     }
 
-    private static UserSnap activeUser(Long id, Lookup l, String what) {
+    static UserSnap activeUser(Long id, Lookup l, String what) {
         UserSnap u = id == null ? null : l.users().get(id);
         if (u == null || !u.active()) throw ApiException.badRequest("BAD_USER", "The selected " + what + " isn't an active user.");
         return u;
@@ -461,14 +464,14 @@ public class TicketService {
         return s;
     }
 
-    private static String patch(String v) {
+    static String patch(String v) {
         if (v == null || v.isBlank()) return null;
         String s = v.strip();
         if (s.length() > 100) throw ApiException.badRequest("TOO_LONG", "Patch reference is too long (100 characters max).");
         return s;
     }
 
-    private static <E extends Enum<E>> E parse(Class<E> type, String v, String field) {
+    static <E extends Enum<E>> E parse(Class<E> type, String v, String field) {
         if (v == null || v.isBlank()) throw ApiException.badRequest("REQUIRED", "Choose a " + field + ".");
         try {
             return Enum.valueOf(type, v);
@@ -477,7 +480,7 @@ public class TicketService {
         }
     }
 
-    private static String clip(String s) {
+    static String clip(String s) {
         return s == null || s.length() <= 400 ? s : s.substring(0, 399) + "…";
     }
 }

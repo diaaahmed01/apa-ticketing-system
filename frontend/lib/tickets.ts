@@ -81,6 +81,13 @@ export interface TicketDetail {
   can: Abilities;
   version: number;
   updatedAt: string | null;
+  testResult: "PASSED" | "FAILED" | null;
+  blockReason: string | null;
+  blockPatch: string | null;
+  blockedBy: PersonRef | null;
+  blockedAt: string | null;
+  /** Workflow actions the current user can take now (server-computed). */
+  actions: WorkflowAction[];
 }
 
 export interface DirectoryEntry { id: number; fullName: string; organization: string; avatarColor: string | null; roles: string[] }
@@ -144,4 +151,53 @@ export function relTime(iso: string) {
   if (s < 86400) return Math.floor(s / 3600) + " h ago";
   if (s < 86400 * 7) return Math.floor(s / 86400) + " d ago";
   return fmtDate(iso);
+}
+
+export type WorkflowAction =
+  | "start" | "submit-review" | "skip-review" | "review" | "test-result" | "mark-ready" | "mark-deployed"
+  | "verify" | "block" | "unblock" | "cancel" | "close" | "contributors";
+
+/** Primary-button label per action. */
+export const ACTION_LABEL: Record<WorkflowAction, string> = {
+  start: "Start work",
+  "submit-review": "Submit for review",
+  "skip-review": "Skip code review",
+  review: "Review",
+  "test-result": "Record test result",
+  "mark-ready": "Mark ready for deployment",
+  "mark-deployed": "Mark deployed",
+  verify: "Verify in production",
+  block: "Block ticket",
+  unblock: "Unblock",
+  cancel: "Cancel ticket",
+  close: "Close as unresolved",
+  contributors: "Edit code contributors",
+};
+
+/** The natural next step, in priority order; the rest go under "More". */
+export const PRIMARY_ACTIONS: WorkflowAction[] = ["start", "submit-review", "review", "test-result", "mark-ready", "mark-deployed", "verify", "unblock"];
+
+/** Timeline wording for the workflow's activity actions (the actor's name is shown before it). */
+export const WORKFLOW_ACTIVITY: Record<string, string> = {
+  REVIEW_SUBMITTED: "submitted the code for review",
+  REVIEW_SKIPPED: "skipped code review",
+  REVIEW_APPROVED: "approved the code review",
+  REVIEW_REJECTED: "rejected the code review",
+  TEST_PASSED: "recorded that testing passed",
+  TEST_FAILED: "recorded that testing failed",
+  DEPLOYED: "marked it deployed",
+  VERIFIED: "verified the fix in production",
+  VERIFICATION_FAILED: "recorded that production verification failed",
+  FOLLOW_UP_CREATED: "opened a follow-up ticket",
+  BLOCKED: "blocked the ticket",
+  UNBLOCKED: "unblocked the ticket",
+  CANCELLED: "cancelled the ticket",
+  CLOSED_UNRESOLVED: "closed the ticket as unresolved",
+  CONTRIBUTORS_CHANGED: "updated the code contributors",
+};
+
+/** "1004", "#1004" or "TKT-1004" → 1004, else null. */
+export function parseTicketNo(text: string): number | null {
+  const m = text.trim().match(/^(?:#?\s*TKT-?|#)?\s*(\d{1,12})$/i);
+  return m ? Number(m[1]) : null;
 }

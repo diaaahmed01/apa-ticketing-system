@@ -75,6 +75,15 @@ public class Ticket {
 
     private String patchReference;
 
+    /** PASSED or FAILED while the fix is in testing; cleared when it re-enters review or testing. */
+    private String testResult;
+
+    @Nationalized
+    private String blockReason;
+    private String blockPatch;
+    private Long blockedBy;
+    private Instant blockedAt;
+
     private Long createdBy;
     private Instant createdAt;
     private Instant updatedAt;

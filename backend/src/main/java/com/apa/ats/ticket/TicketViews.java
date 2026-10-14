@@ -38,7 +38,8 @@ public final class TicketViews {
             PersonRef reviewer, PersonRef tester, List<PersonRef> collaborators, List<PersonRef> contributors,
             String patchReference, PersonRef closedBy, Instant closedAt, List<LinkView> links,
             List<ActivityView> activity, List<String> myRelationships, Abilities can, int version,
-            Instant updatedAt) {}
+            Instant updatedAt, String testResult, String blockReason, String blockPatch, PersonRef blockedBy,
+            Instant blockedAt, List<String> actions) {}
 
     /** Users and modules by id, from the short-lived reference cache. */
     public record Lookup(Map<Long, UserSnap> users, Map<Long, ModuleSnap> modules) {

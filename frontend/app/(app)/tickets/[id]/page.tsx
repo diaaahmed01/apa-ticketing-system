@@ -10,8 +10,9 @@ import { Perf, TicketPaper } from "@/components/TicketPaper";
 import { Barcode, EnvLabel, Person, PriorityBadge, PriorityBars, StatusBadge, TicketCardView, TypeLabel } from "@/components/TicketBits";
 import { toast } from "@/components/Toast";
 import { UserPicker } from "@/components/UserPicker";
+import { WorkflowPanel } from "@/components/WorkflowPanel";
 import {
-  CLOSURE_LABEL, ENV_LABEL, PRIORITIES, PRIORITY_LABEL, STATUS_LABEL, TYPE_LABEL, WORKFLOW, fmtDate, isArabic, relTime,
+  CLOSURE_LABEL, ENV_LABEL, PRIORITIES, PRIORITY_LABEL, STATUS_LABEL, TYPE_LABEL, WORKFLOW, WORKFLOW_ACTIVITY, fmtDate, isArabic, relTime,
   type ActivityView, type DirectoryEntry, type Environment, type PersonRef, type Priority, type Status, type TicketDetail, type TicketType,
 } from "@/lib/tickets";
 
@@ -97,6 +98,7 @@ export default function TicketDetailPage() {
         <Perf />
         <section className="sheet-section" aria-label="Workflow stage">
           <Stepper status={t.status} before={t.statusBeforeBlock} closure={t.closure} />
+          <WorkflowPanel t={t} people={people} onUpdated={setT} onStale={load} />
         </section>
 
         <Perf />
@@ -178,7 +180,7 @@ export default function TicketDetailPage() {
             {label}{n ? <span className="tab-n">{n}</span> : null}
           </button>
         ))}
-        <span className="tabs-later" title="Workflow actions, code review, testing, deployment, comments and attachments come in the next phases">Workflow, review, testing, comments and attachments arrive next</span>
+        <span className="tabs-later" title="Comments and attachments come in a later phase">Comments and attachments arrive next</span>
       </div>
 
       {tab === "overview" && (
@@ -342,7 +344,13 @@ function describe(a: ActivityView): React.ReactNode {
     case "FIELD_CHANGED":
       if (a.field === "description") return <>edited the description</>;
       return <>changed the {FIELD_LABEL[a.field ?? ""] ?? a.field}{a.oldValue || a.newValue ? <> from <b><bdi>{v(a.oldValue)}</bdi></b> to <b><bdi>{v(a.newValue)}</bdi></b></> : null}</>;
-    default: return <>{a.action.toLowerCase().replace(/_/g, " ")}</>;
+    case "REVIEW_SUBMITTED": return <>submitted the code for review{a.newValue && <> by <b dir="auto">{a.newValue}</b></>}</>;
+    case "CONTRIBUTORS_CHANGED": return <>updated the code contributors{a.newValue && <>: <b dir="auto">{a.newValue}</b></>}</>;
+    case "BLOCKED": return <>blocked the ticket{a.newValue && <>, waiting for <b>{a.newValue}</b></>}</>;
+    case "FOLLOW_UP_CREATED": return <>opened follow-up <b>{a.newValue}</b></>;
+    case "VERIFICATION_FAILED": return <>recorded that production verification failed</>;
+    case "DEPLOYED": return <>marked it deployed{a.newValue && <> with patch <b>{a.newValue}</b></>}</>;
+    default: return <>{WORKFLOW_ACTIVITY[a.action] ?? a.action.toLowerCase().replace(/_/g, " ")}</>;
   }
 }
 
