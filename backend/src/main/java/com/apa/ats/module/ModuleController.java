@@ -2,6 +2,7 @@ package com.apa.ats.module;
 
 import com.apa.ats.auth.CurrentUser;
 import com.apa.ats.common.ApiException;
+import com.apa.ats.common.ReferenceCache;
 import com.apa.ats.permission.AccessGuard;
 import java.time.Instant;
 import java.util.List;
@@ -31,6 +32,7 @@ public class ModuleController {
 
     private final Modules modules;
     private final AccessGuard guard;
+    private final ReferenceCache cache;
 
     public record ModuleView(Long id, String name, String nameAr, boolean active, int sortOrder) {}
     public record ModuleInput(String name, String nameAr, Integer sortOrder) {}
@@ -57,7 +59,9 @@ public class ModuleController {
         m.setActive(true);
         m.setSortOrder(in.sortOrder() == null ? nextSort() : in.sortOrder());
         m.setCreatedBy(CurrentUser.require().id());
-        return view(modules.save(m));
+        AtsModule saved = modules.save(m);
+        cache.invalidate();
+        return view(saved);
     }
 
     @PutMapping("/api/modules/{id}")
@@ -71,6 +75,7 @@ public class ModuleController {
         m.setNameAr(blankToNull(in.nameAr()));
         if (in.sortOrder() != null) m.setSortOrder(in.sortOrder());
         touch(m);
+        cache.invalidate();
         return view(m);
     }
 
@@ -82,6 +87,7 @@ public class ModuleController {
         AtsModule m = modules.findById(id).orElseThrow(() -> ApiException.notFound("Module"));
         m.setActive("activate".equals(action));
         touch(m);
+        cache.invalidate();
         return view(m);
     }
 

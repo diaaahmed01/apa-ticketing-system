@@ -2,8 +2,9 @@ package com.apa.ats.ticket;
 
 import com.apa.ats.auth.CurrentUser;
 import com.apa.ats.common.ApiException;
-import com.apa.ats.module.AtsModule;
-import com.apa.ats.module.ModuleController;
+import com.apa.ats.common.ReferenceCache;
+import com.apa.ats.common.ReferenceCache.ModuleSnap;
+import com.apa.ats.common.ReferenceCache.UserSnap;
 import com.apa.ats.permission.AccessGuard;
 import com.apa.ats.permission.Condition;
 import com.apa.ats.ticket.TicketEnums.Environment;
@@ -23,8 +24,6 @@ import com.apa.ats.ticket.TicketViews.LinkView;
 import com.apa.ats.ticket.TicketViews.Lookup;
 import com.apa.ats.ticket.TicketViews.PageOf;
 import com.apa.ats.ticket.TicketViews.PersonRef;
-import com.apa.ats.user.AtsUser;
-import com.apa.ats.user.UserRepository;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -50,8 +49,7 @@ public class TicketService {
     private final TicketRecords.People people;
     private final TicketRecords.Links links;
     private final TicketRecords.Activities activities;
-    private final UserRepository users;
-    private final ModuleController.Modules modules;
+    private final ReferenceCache cache;
     private final AccessGuard guard;
 
     /* ------------------------------------------------------------------ inputs */
@@ -96,7 +94,7 @@ public class TicketService {
         t.setDescription(description(in.description()));
         t.setType(parse(Type.class, in.type(), "type"));
         t.setPriority(parse(Priority.class, in.priority(), "priority"));
-        t.setModuleId(activeModule(in.moduleId(), l).getId());
+        t.setModuleId(activeModule(in.moduleId(), l).id());
         t.setEnvironment(parse(Environment.class, in.environment(), "environment"));
         t.setStatus(Status.OPEN);
         t.setPatchReference(patch(in.patchReference()));
@@ -107,18 +105,18 @@ public class TicketService {
         Set<Condition> rel = EnumSet.of(Condition.TICKET_CREATOR);
         if (in.assigneeId() != null) {
             guard.require("ASSIGN_TICKET", Set.of());
-            t.setAssigneeId(activeUser(in.assigneeId(), l, "assignee").getId());
+            t.setAssigneeId(activeUser(in.assigneeId(), l, "assignee").id());
             t.setAssignedBy(me.id());
             t.setAssignedAt(now);
             if (in.assigneeId().equals(me.id())) rel.add(Condition.CURRENT_ASSIGNEE);
         }
         if (in.reviewerId() != null) {
             guard.require("ASSIGN_REVIEWER", rel);
-            t.setReviewerId(activeUser(in.reviewerId(), l, "reviewer").getId());
+            t.setReviewerId(activeUser(in.reviewerId(), l, "reviewer").id());
         }
         if (in.testerId() != null) {
             guard.require("ASSIGN_TESTER", rel);
-            t.setTesterId(activeUser(in.testerId(), l, "tester").getId());
+            t.setTesterId(activeUser(in.testerId(), l, "tester").id());
         }
         if (t.getReviewerId() != null && t.getReviewerId().equals(t.getTesterId())) {
             throw ApiException.badRequest("SAME_REVIEWER_TESTER", "Choose different people for reviewer and tester.");
@@ -175,9 +173,9 @@ public class TicketService {
             if (v != t.getType()) { changes.add(new String[] {"type", t.getType().name(), v.name()}); t.setType(v); }
         }
         if (in.moduleId() != null && !in.moduleId().equals(t.getModuleId())) {
-            AtsModule m = activeModule(in.moduleId(), l);
-            changes.add(new String[] {"module", l.module(t.getModuleId()).name(), m.getName()});
-            t.setModuleId(m.getId());
+            ModuleSnap m = activeModule(in.moduleId(), l);
+            changes.add(new String[] {"module", l.module(t.getModuleId()).name(), m.name()});
+            t.setModuleId(m.id());
         }
         if (in.environment() != null) {
             Environment v = parse(Environment.class, in.environment(), "environment");
@@ -411,9 +409,8 @@ public class TicketService {
     }
 
     private Lookup lookup() {
-        return new Lookup(
-                users.findAll().stream().collect(Collectors.toMap(AtsUser::getId, Function.identity())),
-                modules.findAll().stream().collect(Collectors.toMap(AtsModule::getId, Function.identity())));
+        ReferenceCache.Snapshot s = cache.get();
+        return new Lookup(s.users(), s.modules());
     }
 
     private Ticket load(Long id) {
@@ -437,16 +434,16 @@ public class TicketService {
         t.setUpdatedBy(actor);
     }
 
-    private AtsModule activeModule(Long id, Lookup l) {
+    private static ModuleSnap activeModule(Long id, Lookup l) {
         if (id == null) throw ApiException.badRequest("REQUIRED", "Choose a module.");
-        AtsModule m = l.modules().get(id);
-        if (m == null || !m.isActive()) throw ApiException.badRequest("BAD_MODULE", "That module isn't available. Pick another one.");
+        ModuleSnap m = l.modules().get(id);
+        if (m == null || !m.active()) throw ApiException.badRequest("BAD_MODULE", "That module isn't available. Pick another one.");
         return m;
     }
 
-    private static AtsUser activeUser(Long id, Lookup l, String what) {
-        AtsUser u = id == null ? null : l.users().get(id);
-        if (u == null || !u.isActive()) throw ApiException.badRequest("BAD_USER", "The selected " + what + " isn't an active user.");
+    private static UserSnap activeUser(Long id, Lookup l, String what) {
+        UserSnap u = id == null ? null : l.users().get(id);
+        if (u == null || !u.active()) throw ApiException.badRequest("BAD_USER", "The selected " + what + " isn't an active user.");
         return u;
     }
 

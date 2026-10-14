@@ -25,6 +25,7 @@ spring:
       hibernate:
         # ATS columns are plain TIMESTAMP (not WITH TIME ZONE), read in the server's zone.
         type.preferred_instant_jdbc_type: TIMESTAMP
+        default_batch_fetch_size: 50
     show-sql: false
 
 ats:

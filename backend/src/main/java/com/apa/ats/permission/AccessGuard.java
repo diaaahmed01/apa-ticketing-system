@@ -9,6 +9,8 @@ import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
 
 /**
  * Answers "may this user do X?" from the configurable grants in ATS_ROLE_PERMISSIONS.
@@ -23,8 +25,20 @@ public class AccessGuard {
 
     private final PermissionRepositories.Grants grants;
 
-    /** Permission code → granted condition codes, for the given user. */
+    /** Permission code → granted condition codes, for the given user (read once per request). */
+    @SuppressWarnings("unchecked")
     public Map<String, Set<String>> grantsOf(CurrentUser user) {
+        RequestAttributes req = RequestContextHolder.getRequestAttributes();
+        if (req == null) return loadGrants(user);
+        String key = "ats.grants." + user.id();
+        Object cached = req.getAttribute(key, RequestAttributes.SCOPE_REQUEST);
+        if (cached != null) return (Map<String, Set<String>>) cached;
+        Map<String, Set<String>> loaded = loadGrants(user);
+        req.setAttribute(key, loaded, RequestAttributes.SCOPE_REQUEST);
+        return loaded;
+    }
+
+    private Map<String, Set<String>> loadGrants(CurrentUser user) {
         Map<String, Set<String>> out = new HashMap<>();
         if (user.roleIds().isEmpty()) return out;
         for (Object[] row : grants.codesForRoles(user.roleIds())) {

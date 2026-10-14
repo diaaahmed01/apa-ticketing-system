@@ -1,7 +1,7 @@
 package com.apa.ats.ticket;
 
-import com.apa.ats.module.AtsModule;
-import com.apa.ats.user.AtsUser;
+import com.apa.ats.common.ReferenceCache.ModuleSnap;
+import com.apa.ats.common.ReferenceCache.UserSnap;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -40,19 +40,19 @@ public final class TicketViews {
             List<ActivityView> activity, List<String> myRelationships, Abilities can, int version,
             Instant updatedAt) {}
 
-    /** Users and modules by id, loaded once per request (both lists are small). */
-    public record Lookup(Map<Long, AtsUser> users, Map<Long, AtsModule> modules) {
+    /** Users and modules by id, from the short-lived reference cache. */
+    public record Lookup(Map<Long, UserSnap> users, Map<Long, ModuleSnap> modules) {
 
         public PersonRef person(Long id) {
             if (id == null) return null;
-            AtsUser u = users.get(id);
+            UserSnap u = users.get(id);
             if (u == null) return new PersonRef(id, "Unknown user", null, null, false);
-            return new PersonRef(u.getId(), u.getFullName(), u.getOrganization().name(), u.getAvatarColor(), u.isActive());
+            return new PersonRef(u.id(), u.fullName(), u.organization(), u.avatarColor(), u.active());
         }
 
         public ModuleRef module(Long id) {
-            AtsModule m = modules.get(id);
-            return m == null ? new ModuleRef(id, "Unknown module", null) : new ModuleRef(m.getId(), m.getName(), m.getNameAr());
+            ModuleSnap m = modules.get(id);
+            return m == null ? new ModuleRef(id, "Unknown module", null) : new ModuleRef(m.id(), m.name(), m.nameAr());
         }
 
         public String name(Long userId) {

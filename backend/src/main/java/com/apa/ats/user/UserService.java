@@ -3,6 +3,7 @@ package com.apa.ats.user;
 import com.apa.ats.auth.CurrentUser;
 import com.apa.ats.common.ApiException;
 import com.apa.ats.common.Passwords;
+import com.apa.ats.common.ReferenceCache;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -27,6 +28,7 @@ public class UserService {
     private final UserRepository users;
     private final RoleRepository roles;
     private final PasswordEncoder encoder;
+    private final ReferenceCache cache;
 
     public record UserInput(String username, String fullName, String email, String organization,
                             String preferredLang, String avatarColor, List<String> roles) {}
@@ -63,7 +65,9 @@ public class UserService {
         u.setActive(true);
         if (u.getAvatarColor() == null) u.setAvatarColor(PALETTE.get(Math.floorMod(username.hashCode(), PALETTE.size())));
         u.setCreatedBy(CurrentUser.require().id());
-        return new Issued(users.save(u), temp);
+        AtsUser saved = users.save(u);
+        cache.invalidate();
+        return new Issued(saved, temp);
     }
 
     @Transactional
@@ -71,6 +75,7 @@ public class UserService {
         AtsUser u = get(id);
         applyProfile(u, in, id);
         touch(u);
+        cache.invalidate();
         return u;
     }
 
@@ -83,6 +88,7 @@ public class UserService {
         u.getRoles().clear();
         u.getRoles().addAll(next);
         touch(u);
+        cache.invalidate();
         return u;
     }
 
@@ -99,6 +105,7 @@ public class UserService {
         u.setActive(active);
         if (active) { u.setFailedLogins(0); u.setLockedUntil(null); }
         touch(u);
+        cache.invalidate();
         return u;
     }
 
@@ -112,6 +119,7 @@ public class UserService {
         u.setFailedLogins(0);
         u.setLockedUntil(null);
         touch(u);
+        cache.invalidate();
         return new Issued(u, temp);
     }
 

@@ -40,7 +40,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         Optional<String> token = token(req);
         if (token.isPresent()) {
             jwt.parse(token.get())
-                    .flatMap(s -> users.findById(s.userId()).filter(u -> valid(u, s)))
+                    .flatMap(s -> users.findWithRolesById(s.userId()).filter(u -> valid(u, s)))
                     .ifPresent(u -> {
                         CurrentUser cu = CurrentUser.of(u);
                         var auth = new UsernamePasswordAuthenticationToken(cu, null, List.of());
