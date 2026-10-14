@@ -8,11 +8,12 @@ import { useNotifications } from "@/lib/notifications";
 import { useSession } from "@/lib/session";
 import { Avatar, Icon, type IconName } from "./Icon";
 import { NotificationBell } from "./NotificationBell";
+import { parseTicketNo } from "@/lib/tickets";
 
 interface NavItem { href: string; label: string; icon: IconName; permission?: string; soon?: boolean }
 
 const MAIN: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: "dashboard", soon: true },
+  { href: "/dashboard", label: "Dashboard", icon: "dashboard", permission: "DASHBOARD_VIEW" },
   { href: "/tickets", label: "All Tickets", icon: "ticket" },
   { href: "/tickets/mine", label: "My Tickets", icon: "mine" },
   { href: "/tickets/new", label: "Create Ticket", icon: "create", permission: "TICKET_CREATE" },
@@ -99,10 +100,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <button className="icon-btn menu-btn" type="button" aria-label="Open navigation" onClick={() => setDrawer(true)}>
             <Icon name="menu" />
           </button>
-          <label className="global-search">
-            <Icon name="search" size="sm" />
-            <input type="search" placeholder="Search tickets, people, patches…" aria-label="Global search" disabled title="Search arrives with tickets" />
-          </label>
+          <GlobalSearch />
           <div className="top-actions">
             <NotificationBell />
             {me && <ProfileMenu name={me.fullName} color={me.avatarColor} role={me.roles[0]?.name ?? ""} />}
@@ -111,6 +109,41 @@ export function Shell({ children }: { children: React.ReactNode }) {
         {children}
       </div>
     </div>
+  );
+}
+
+/** Enter opens a ticket by number or searches the list; "/" focuses the box from anywhere outside a field. */
+function GlobalSearch() {
+  const router = useRouter();
+  const ref = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName))) return;
+      e.preventDefault();
+      ref.current?.focus();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const text = ref.current?.value.trim() ?? "";
+    if (!text) return;
+    const no = parseTicketNo(text);
+    router.push(no !== null ? `/tickets/${no}` : "/tickets?q=" + encodeURIComponent(text));
+    ref.current?.blur();
+  }
+
+  return (
+    <form className="global-search" role="search" onSubmit={submit}>
+      <Icon name="search" size="sm" />
+      <input ref={ref} type="search" placeholder="Search tickets or TKT-number…" aria-label="Search tickets" aria-keyshortcuts="/" enterKeyHint="search" />
+      <kbd aria-hidden="true">/</kbd>
+    </form>
   );
 }
 
