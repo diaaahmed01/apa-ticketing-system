@@ -51,6 +51,12 @@ public class EmailDispatcher implements ApplicationRunner {
         }
     }
 
+    /** Tries one message right away (used by the settings page); returns the saved row with its new status. */
+    public EmailOutbox sendNow(EmailOutbox row) {
+        deliver(props.mail(), row);
+        return row;
+    }
+
     private void deliver(AtsProperties.Mail mail, EmailOutbox row) {
         try {
             smtp.send(mail, row.getToAddress(), row.getSubject(), row.getBodyText());

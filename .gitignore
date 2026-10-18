@@ -1,6 +1,7 @@
 # Build output
 backend/target/
 frontend/.next/
+frontend/.next-prod/
 frontend/tsconfig.tsbuildinfo
 *.tsbuildinfo
 

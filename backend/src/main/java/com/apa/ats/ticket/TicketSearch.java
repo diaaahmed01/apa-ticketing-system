@@ -29,7 +29,7 @@ public final class TicketSearch {
     public record Filter(String q, List<String> status, List<String> priority, List<Long> module,
                          List<Long> assignee, List<String> environment, List<String> type, List<Long> creator,
                          List<Long> reviewer, List<Long> tester, List<String> closure, Boolean hasPatch,
-                         boolean mine, LocalDate createdFrom, LocalDate createdTo, Sort sort) {}
+                         boolean mine, LocalDate createdFrom, LocalDate createdTo, LocalDate closedFrom, LocalDate closedTo, Sort sort) {}
 
     static Specification<Ticket> spec(Filter f, Long me) {
         return (root, query, cb) -> {
@@ -75,6 +75,13 @@ public final class TicketSearch {
             if (f.createdTo() != null) {
                 Instant end = f.createdTo().plusDays(1).atStartOfDay(zone).toInstant();
                 and.add(cb.lessThan(root.get("createdAt"), end));
+            }
+
+            if (f.closedFrom() != null) {
+                and.add(cb.greaterThanOrEqualTo(root.get("closedAt"), f.closedFrom().atStartOfDay(zone).toInstant()));
+            }
+            if (f.closedTo() != null) {
+                and.add(cb.lessThan(root.get("closedAt"), f.closedTo().plusDays(1).atStartOfDay(zone).toInstant()));
             }
 
             if (f.mine()) {

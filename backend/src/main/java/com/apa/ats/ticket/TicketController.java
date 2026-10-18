@@ -47,11 +47,13 @@ public class TicketController {
             @RequestParam(defaultValue = "false") boolean mine,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate createdFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate createdTo,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate closedFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate closedTo,
             @RequestParam(defaultValue = "NEWEST") TicketSearch.Sort sort,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "30") int size) {
         return service.search(new TicketSearch.Filter(q, status, priority, module, assignee, environment, type, creator,
-                reviewer, tester, closure, hasPatch, mine, createdFrom, createdTo, sort), page, size);
+                reviewer, tester, closure, hasPatch, mine, createdFrom, createdTo, closedFrom, closedTo, sort), page, size);
     }
 
     @GetMapping("/{id}")

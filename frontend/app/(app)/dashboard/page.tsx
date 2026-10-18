@@ -140,7 +140,7 @@ function Dashboard() {
               href={link("createdFrom=" + since)} />
             <Kpi icon="checkCircle" label="Resolved" value={data.totals.closedInPeriod.resolved} tone="good"
               foot={`${num(data.totals.closedInPeriod.unresolved)} unresolved · ${num(data.totals.closedInPeriod.cancelled)} cancelled`}
-              href={link("status=CLOSED", "closure=RESOLVED")} />
+              href={link("status=CLOSED", "closure=RESOLVED", "closedFrom=" + since)} />
           </section>
 
           <section className="panel dash-queue">

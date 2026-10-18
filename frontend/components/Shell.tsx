@@ -24,7 +24,7 @@ const ADMIN: NavItem[] = [
   { href: "/admin/users", label: "User Management", icon: "users", permission: "USER_VIEW" },
   { href: "/admin/permissions", label: "Roles & Permissions", icon: "shield", permission: "ROLE_PERMISSION_MANAGE" },
   { href: "/admin/modules", label: "Module Management", icon: "layers", permission: "MODULE_MANAGE" },
-  { href: "/admin/settings", label: "Settings", icon: "settings", permission: "SETTINGS_MANAGE", soon: true },
+  { href: "/admin/settings", label: "Settings", icon: "settings", permission: "SETTINGS_MANAGE" },
 ];
 
 function readPref(key: string) { try { return localStorage.getItem(key); } catch { return null; } }
@@ -112,10 +112,13 @@ export function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Enter opens a ticket by number or searches the list; "/" focuses the box from anywhere outside a field. */
+/** Enter opens a ticket by number or searches the list; "/" focuses the box from anywhere outside a field. Under 720px a search button opens a full-width field instead. */
 function GlobalSearch() {
   const router = useRouter();
   const ref = useRef<HTMLInputElement>(null);
+  const mobileRef = useRef<HTMLInputElement>(null);
+  const openerRef = useRef<HTMLButtonElement>(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -123,27 +126,66 @@ function GlobalSearch() {
       const el = e.target as HTMLElement | null;
       if (el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName))) return;
       e.preventDefault();
-      ref.current?.focus();
+      if (window.matchMedia("(max-width: 720px)").matches) setMobileOpen(true);
+      else ref.current?.focus();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    const text = ref.current?.value.trim() ?? "";
-    if (!text) return;
+  useEffect(() => { if (mobileOpen) mobileRef.current?.focus(); }, [mobileOpen]);
+
+  function go(input: HTMLInputElement | null) {
+    const text = input?.value.trim() ?? "";
+    if (!text) return false;
     const no = parseTicketNo(text);
     router.push(no !== null ? `/tickets/${no}` : "/tickets?q=" + encodeURIComponent(text));
-    ref.current?.blur();
+    return true;
+  }
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (go(ref.current)) ref.current?.blur();
+  }
+
+  function submitMobile(e: React.FormEvent) {
+    e.preventDefault();
+    if (go(mobileRef.current)) setMobileOpen(false);
+  }
+
+  function closeMobile() {
+    setMobileOpen(false);
+    openerRef.current?.focus();
   }
 
   return (
-    <form className="global-search" role="search" onSubmit={submit}>
-      <Icon name="search" size="sm" />
-      <input ref={ref} type="search" placeholder="Search tickets or TKT-number…" aria-label="Search tickets" aria-keyshortcuts="/" enterKeyHint="search" />
-      <kbd aria-hidden="true">/</kbd>
-    </form>
+    <>
+      <form className="global-search" role="search" onSubmit={submit}>
+        <Icon name="search" size="sm" />
+        <input ref={ref} type="search" placeholder="Search tickets or TKT-number…" aria-label="Search tickets" aria-keyshortcuts="/" enterKeyHint="search" />
+        <kbd aria-hidden="true">/</kbd>
+      </form>
+      <button ref={openerRef} className="icon-btn search-btn" type="button" aria-label="Search tickets" aria-haspopup="dialog" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)}>
+        <Icon name="search" />
+      </button>
+      {mobileOpen && (
+        <form className="search-overlay" role="search" onSubmit={submitMobile}>
+          <Icon name="search" size="sm" />
+          <input
+            ref={mobileRef}
+            type="search"
+            placeholder="Search tickets or TKT-number…"
+            aria-label="Search tickets"
+            enterKeyHint="search"
+            onBlur={() => setMobileOpen(false)}
+            onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); closeMobile(); } }}
+          />
+          <button className="icon-btn" type="button" aria-label="Close search" onMouseDown={(e) => e.preventDefault()} onClick={closeMobile}>
+            <Icon name="x" />
+          </button>
+        </form>
+      )}
+    </>
   );
 }
 

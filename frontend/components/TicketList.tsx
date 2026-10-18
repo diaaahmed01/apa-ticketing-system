@@ -111,7 +111,7 @@ export function TicketList({ mine }: { mine: boolean }) {
   ];
   const allDefs = [...defs, ...advDefs];
   const openDef = allDefs.find((d) => d.key === openKey);
-  const hasFilters = LIST_KEYS.some((k) => params.has(k)) || params.has("q") || params.has("hasPatch") || params.has("createdFrom") || params.has("createdTo");
+  const hasFilters = LIST_KEYS.some((k) => params.has(k)) || params.has("q") || params.has("hasPatch") || params.has("createdFrom") || params.has("createdTo") || params.has("closedFrom") || params.has("closedTo");
 
   function chip(d: FilterDef) {
     const sel = params.getAll(d.key);
@@ -132,6 +132,7 @@ export function TicketList({ mine }: { mine: boolean }) {
   }
 
   const dateSet = params.has("createdFrom") || params.has("createdTo");
+  const closedSet = params.has("closedFrom") || params.has("closedTo");
 
   return (
     <main className="page">
@@ -169,6 +170,17 @@ export function TicketList({ mine }: { mine: boolean }) {
           >
             <Icon name="calendar" size="xs" />{dateSet ? <>Created: <span className="val">{params.get("createdFrom") ?? "…"} → {params.get("createdTo") ?? "now"}</span></> : "Created"}<Icon name="chevDown" size="xs" />
           </button>
+          {closedSet && (
+            <button
+              type="button"
+              className="chip-select on"
+              title="Remove the closed-date filter"
+              aria-label={`Remove closed-date filter: ${params.get("closedFrom") ?? "…"} to ${params.get("closedTo") ?? "now"}`}
+              onClick={() => { const sp = new URLSearchParams(params.toString()); sp.delete("closedFrom"); sp.delete("closedTo"); sp.delete("page"); router.replace("?" + sp.toString(), { scroll: false }); }}
+            >
+              <Icon name="calendar" size="xs" />Closed: <span className="val">{params.get("closedFrom") ?? "…"} → {params.get("closedTo") ?? "now"}</span><Icon name="x" size="xs" />
+            </button>
+          )}
           <button className="btn ghost sm" type="button" aria-expanded={advanced} onClick={() => setAdvanced((v) => !v)}>
             <Icon name="settings" size="sm" />Advanced filters
           </button>
