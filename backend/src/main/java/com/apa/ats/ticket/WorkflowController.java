@@ -4,6 +4,7 @@ import com.apa.ats.ticket.TicketViews.Detail;
 import com.apa.ats.ticket.WorkflowService.VerifyResult;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class WorkflowController {
 
     private final WorkflowService service;
+    private final WorkflowTimelineService timeline;
 
     public record VersionRequest(Integer version) {}
     public record SubmitReviewRequest(Integer version, List<Long> contributorIds, Long reviewerId) {}
@@ -24,10 +26,16 @@ public class WorkflowController {
     public record ReviewRequest(Integer version, String decision, String reason) {}
     public record ResultRequest(Integer version, String result, String reason) {}
     public record DeployRequest(Integer version, String patchReference) {}
-    public record VerifyRequest(Integer version, String result, String reason, String followUpTitle) {}
+    public record VerifyRequest(Integer version, String result, String reason, String followUpTitle,
+                                WorkflowService.FollowUpInput followUp) {}
     public record BlockRequest(Integer version, String reason, Long blockedByTicketId, String blockPatch) {}
     public record NoteRequest(Integer version, String note) {}
     public record ContributorsRequest(Integer version, List<Long> contributorIds) {}
+
+    @GetMapping("/workflow")
+    public WorkflowViews.Workflow workflow(@PathVariable Long id) {
+        return timeline.workflow(id);
+    }
 
     @PostMapping("/start")
     public Detail start(@PathVariable Long id, @RequestBody VersionRequest r) {
@@ -66,7 +74,7 @@ public class WorkflowController {
 
     @PostMapping("/verify")
     public VerifyResult verify(@PathVariable Long id, @RequestBody VerifyRequest r) {
-        return service.verify(id, r.version(), r.result(), r.reason(), r.followUpTitle());
+        return service.verify(id, r.version(), r.result(), r.reason(), r.followUpTitle(), r.followUp());
     }
 
     @PostMapping("/block")

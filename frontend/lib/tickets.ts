@@ -287,3 +287,54 @@ export function parseTicketNo(text: string): number | null {
   const m = text.trim().match(/^(?:#?\s*TKT-?|#)?\s*(\d{1,12})$/i);
   return m ? Number(m[1]) : null;
 }
+
+/* ---- GET /api/tickets/{id}/workflow ---- */
+
+export interface WfStage { status: Status; enteredAt: string; enteredBy: PersonRef | null; note: string | null; leftAt: string | null }
+export interface WfCurrent { status: Status; waitingOn: PersonRef | null; waitingFor: string }
+export type ReviewDecision = "APPROVED" | "REJECTED" | "SKIPPED";
+export interface WfReviewRound {
+  submittedAt: string | null; submittedBy: PersonRef | null; contributors: string[] | null;
+  decision: ReviewDecision | null; reason: string | null; decidedAt: string | null; decidedBy: PersonRef | null;
+}
+export interface WfReview {
+  reviewer: PersonRef | null; contributors: PersonRef[];
+  status: "NOT_SUBMITTED" | "AWAITING" | ReviewDecision; rounds: WfReviewRound[];
+}
+export interface WfTestRound {
+  startedAt: string; result: "PASSED" | "FAILED" | null; notes: string | null;
+  testedBy: PersonRef | null; testedAt: string | null; evidence: AttachmentView[];
+}
+export interface WfTesting { tester: PersonRef | null; status: "NOT_STARTED" | "AWAITING" | "PASSED" | "FAILED"; rounds: WfTestRound[] }
+export interface WfVerification { result: "PASSED" | "FAILED"; at: string; by: PersonRef | null; reason: string | null; followUp: TicketCard | null }
+export interface WfDeployment {
+  patchReference: string | null; readyAt: string | null; readyBy: PersonRef | null;
+  deployedAt: string | null; deployedBy: PersonRef | null; verification: WfVerification | null;
+}
+export interface WfBlock {
+  reason: string | null; blockedByTicket: TicketCard | null; blockPatch: string | null;
+  blockedAt: string | null; blockedBy: PersonRef | null; unblockedAt: string | null; unblockedBy: PersonRef | null;
+  note: string | null; current: boolean;
+}
+export interface WorkflowData {
+  stages: WfStage[]; current: WfCurrent; review: WfReview; testing: WfTesting; deployment: WfDeployment; blocks: WfBlock[];
+}
+
+/** Colour token per status, for dots and bars (matches the .status badges). */
+export const STATUS_COLOR: Record<Status, string> = {
+  OPEN: "var(--st-open)", IN_PROGRESS: "var(--st-progress)", CODE_REVIEW: "var(--st-review)", TESTING: "var(--st-testing)",
+  READY_FOR_DEPLOYMENT: "var(--st-ready)", DEPLOYED: "var(--st-deployed)", PRODUCTION_VERIFICATION: "var(--st-verify)",
+  CLOSED: "var(--st-closed)", BLOCKED: "var(--st-blocked)",
+};
+
+/** "3 min", "4 h 20 min", "2 d 5 h": how long between two instants (to now when `to` is missing). */
+export function duration(from: string, to?: string | null) {
+  const ms = Math.max(0, (to ? new Date(to).getTime() : Date.now()) - new Date(from).getTime());
+  const m = Math.floor(ms / 60000);
+  if (m < 1) return "under a minute";
+  if (m < 60) return m + " min";
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + " h" + (m % 60 ? " " + (m % 60) + " min" : "");
+  const d = Math.floor(h / 24);
+  return d + " d" + (h % 24 ? " " + (h % 24) + " h" : "");
+}

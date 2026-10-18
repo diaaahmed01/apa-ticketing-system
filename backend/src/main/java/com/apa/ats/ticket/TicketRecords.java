@@ -98,9 +98,11 @@ public final class TicketRecords {
     public interface Links extends JpaRepository<TicketLink, TicketLink.Key> {
         List<TicketLink> findByFromTicketIdOrToTicketId(Long from, Long to);
         List<TicketLink> findByToTicketIdAndLinkType(Long to, LinkType type);
+        List<TicketLink> findByFromTicketIdAndLinkType(Long from, LinkType type);
     }
 
     public interface Activities extends JpaRepository<TicketActivity, Long> {
         List<TicketActivity> findTop300ByTicketIdOrderByCreatedAtDescIdDesc(Long ticketId);
+        List<TicketActivity> findByTicketIdOrderByCreatedAtAscIdAsc(Long ticketId);
     }
 }

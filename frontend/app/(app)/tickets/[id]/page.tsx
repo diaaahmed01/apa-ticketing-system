@@ -2,22 +2,24 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError, type ModuleView } from "@/lib/api";
 import { AttachmentsTab, CommentsTab } from "@/components/Discussion";
 import { Avatar, Icon } from "@/components/Icon";
 import { Modal } from "@/components/Modal";
 import { Perf, TicketPaper } from "@/components/TicketPaper";
-import { Barcode, EnvLabel, Person, PriorityBadge, PriorityBars, StatusBadge, TicketCardView, TypeLabel } from "@/components/TicketBits";
+import { Barcode, EnvLabel, Person, PriorityBadge, PriorityBars, StatusBadge, TypeLabel } from "@/components/TicketBits";
 import { toast } from "@/components/Toast";
 import { UserPicker } from "@/components/UserPicker";
 import { WorkflowPanel } from "@/components/WorkflowPanel";
+import { CodeReviewTab, DependenciesTab, DeploymentTab, TestingTab, WorkflowTab, useWorkflowData } from "@/components/WorkflowTabs";
 import {
   CLOSURE_LABEL, ENV_LABEL, PRIORITIES, PRIORITY_LABEL, STATUS_LABEL, TYPE_LABEL, WORKFLOW, WORKFLOW_ACTIVITY, fmtDate, isArabic, relTime,
-  type ActivityView, type DirectoryEntry, type Environment, type PersonRef, type Priority, type Status, type TicketDetail, type TicketType,
+  type ActivityView, type DirectoryEntry, type Environment, type PersonRef, type Priority, type Status, type TicketDetail, type TicketType, type WorkflowAction,
 } from "@/lib/tickets";
 
-type Tab = "overview" | "comments" | "attachments" | "related" | "activity";
+type Tab = "overview" | "workflow" | "review" | "testing" | "deployment" | "comments" | "attachments" | "dependencies" | "activity";
+const WORKFLOW_TABS: Tab[] = ["workflow", "review", "testing", "deployment", "dependencies"];
 type RoleKey = "assignee" | "reviewer" | "tester";
 
 export default function TicketDetailPage() {
@@ -31,6 +33,11 @@ export default function TicketDetailPage() {
   const [editing, setEditing] = useState(false);
   const [assigning, setAssigning] = useState<RoleKey | null>(null);
   const [addingCollab, setAddingCollab] = useState(false);
+  // The workflow tabs share one /workflow document, fetched once any of them has been opened.
+  const [wfRequest, setWfRequest] = useState<{ action: WorkflowAction; seq: number } | null>(null);
+  const wfSeq = useRef(0);
+  const wf = useWorkflowData(id, t ? `${t.version}|${t.attachmentCount}|${t.status}` : "", !!t && WORKFLOW_TABS.some((k) => seen.has(k)));
+  const startAction = useCallback((action: WorkflowAction) => setWfRequest({ action, seq: ++wfSeq.current }), []);
 
   const load = useCallback(async () => {
     try {
@@ -115,7 +122,7 @@ export default function TicketDetailPage() {
         <Perf />
         <section className="sheet-section" aria-label="Workflow stage">
           <Stepper status={t.status} before={t.statusBeforeBlock} closure={t.closure} />
-          <WorkflowPanel t={t} people={people} onUpdated={setT} onStale={load} />
+          <WorkflowPanel t={t} people={people} onUpdated={setT} onStale={load} openRequest={wfRequest} />
         </section>
 
         <Perf />
@@ -192,8 +199,8 @@ export default function TicketDetailPage() {
       </TicketPaper>
 
       <div className="tabs" role="tablist" aria-label="Ticket sections">
-        {([["overview", "Overview", null], ["comments", "Comments", t.commentCount], ["attachments", "Attachments", t.attachmentCount], ["related", "Related tickets", t.links.length], ["activity", "Activity", t.activity.length]] as [Tab, string, number | null][]).map(([k, label, n]) => (
-          <button key={k} type="button" role="tab" aria-selected={tab === k} className="tab" onClick={() => openTab(k)}>
+        {([["overview", "Overview", null], ["workflow", "Workflow", null], ["review", "Code Review", null], ["testing", "Testing", null], ["deployment", "Deployment", null], ["comments", "Comments", t.commentCount], ["attachments", "Attachments", t.attachmentCount], ["dependencies", "Dependencies", t.links.length], ["activity", "Activity", t.activity.length]] as [Tab, string, number | null][]).map(([k, label, n]) => (
+          <button key={k} type="button" role="tab" aria-selected={tab === k} className="tab" onClick={(e) => { openTab(k); e.currentTarget.scrollIntoView({ block: "nearest", inline: "nearest" }); }}>
             {label}{n ? <span className="tab-n">{n}</span> : null}
           </button>
         ))}
@@ -214,7 +221,11 @@ export default function TicketDetailPage() {
 
       {seen.has("comments") && <div hidden={tab !== "comments"}><CommentsTab t={t} onChanged={load} /></div>}
       {seen.has("attachments") && <div hidden={tab !== "attachments"}><AttachmentsTab t={t} onChanged={load} onShowComment={showComment} /></div>}
-      {tab === "related" && <RelatedTab t={t} onChange={(p, ok) => act(p, ok)} />}
+      {tab === "workflow" && <WorkflowTab t={t} wf={wf} onAction={startAction} />}
+      {tab === "review" && <CodeReviewTab t={t} wf={wf} onAction={startAction} />}
+      {tab === "testing" && <TestingTab t={t} wf={wf} onAction={startAction} />}
+      {tab === "deployment" && <DeploymentTab t={t} wf={wf} onAction={startAction} />}
+      {tab === "dependencies" && <DependenciesTab t={t} wf={wf} onAction={startAction} onChange={(p, ok) => act(p, ok)} />}
       {tab === "activity" && <ActivityTab items={t.activity} />}
 
       {editing && <EditModal t={t} onClose={() => setEditing(false)} onSave={async (body) => { if (await act(api.put<TicketDetail>(`/api/tickets/${t.id}`, { ...body, version: t.version }), "Ticket updated")) setEditing(false); }} />}
@@ -299,44 +310,6 @@ function Stepper({ status, before, closure }: { status: Status; before: Status |
         );
       })}
     </ol>
-  );
-}
-
-function RelatedTab({ t, onChange }: { t: TicketDetail; onChange: (p: Promise<TicketDetail>, ok: string) => Promise<boolean> }) {
-  const [num, setNum] = useState("");
-  const LABEL = { RELATED: "Related", FOLLOW_UP_OF: "Follow-up", BLOCKED_BY: "Blocking" } as const;
-  return (
-    <section className="tab-panel">
-      {t.can.link && (
-        <form className="link-form panel" onSubmit={async (e) => {
-          e.preventDefault();
-          const n = Number(num.replace(/\D/g, ""));
-          if (!n) return;
-          if (await onChange(api.post<TicketDetail>(`/api/tickets/${t.id}/related`, { ticketId: n }), `Linked TKT-${n}`)) setNum("");
-        }}>
-          <Icon name="link" size="sm" />
-          <input className="input" placeholder="Ticket number, e.g. 1004" value={num} onChange={(e) => setNum(e.target.value)} aria-label="Ticket number to link" inputMode="numeric" />
-          <button className="btn" type="submit" disabled={!num.replace(/\D/g, "")}>Link ticket</button>
-        </form>
-      )}
-      {t.links.length === 0 ? (
-        <div className="empty panel"><h3>No related tickets</h3><p>Link tickets that describe the same problem or depend on each other.</p></div>
-      ) : (
-        <div className="ticket-grid">
-          {t.links.map((l) => (
-            <div key={l.type + l.ticket.id} className="rel-card">
-              <div className="rel-head">
-                <span className="rel-type">{LABEL[l.type]}{l.type === "FOLLOW_UP_OF" && (l.direction === "OUTGOING" ? " of" : " ticket")}</span>
-                {l.type === "RELATED" && t.can.link && (
-                  <button className="clear-link" type="button" onClick={() => onChange(api.del<TicketDetail>(`/api/tickets/${t.id}/related/${l.ticket.id}`), `Unlinked TKT-${l.ticket.id}`)}>Unlink</button>
-                )}
-              </div>
-              <TicketCardView t={l.ticket} />
-            </div>
-          ))}
-        </div>
-      )}
-    </section>
   );
 }
 

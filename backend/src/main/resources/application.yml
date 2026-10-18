@@ -61,7 +61,8 @@ ats:
     max-mb: ${ATS_ATTACHMENTS_MAX_MB:20}
   # Base URL used in links inside notification emails.
   public-url: ${ATS_PUBLIC_URL:http://localhost:3010}
-  # Email is always queued in ATS_EMAIL_OUTBOX; it is only sent while enabled is true.
+  # Emails are always queued in ATS_EMAIL_OUTBOX; they are only sent while enabled is true.
+  # Only new tickets send email (to the vendor side). All other updates are in-app only.
   mail:
     enabled: ${ATS_MAIL_ENABLED:false}
     host: ${ATS_MAIL_HOST:}
@@ -70,3 +71,5 @@ ats:
     username: ${ATS_MAIL_USERNAME:}
     password: ${ATS_MAIL_PASSWORD:}
     starttls: ${ATS_MAIL_STARTTLS:false}
+    # Extra addresses (comma-separated) that get the new-ticket email, besides the active HQ (VENDOR) users.
+    vendor-recipients: ${ATS_MAIL_VENDOR_RECIPIENTS:}

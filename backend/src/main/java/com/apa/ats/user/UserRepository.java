@@ -25,6 +25,9 @@ public interface UserRepository extends JpaRepository<AtsUser, Long> {
     @Query("select distinct u from AtsUser u left join fetch u.roles order by u.fullName")
     List<AtsUser> findAllWithRoles();
 
+    /** Active users of one organization (the new-ticket email goes to the VENDOR ones). */
+    List<AtsUser> findByOrganizationAndActiveTrue(AtsUser.Organization organization);
+
     @Query("select count(distinct u) from AtsUser u join u.roles r where r.code = ?1 and u.active = true")
     long countActiveWithRole(String roleCode);
 }

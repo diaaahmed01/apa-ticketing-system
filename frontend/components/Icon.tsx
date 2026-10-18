@@ -75,7 +75,8 @@ export function Icon({ name, size, className }: { name: IconName; size?: "sm" | 
 }
 
 export function Avatar({ name, color, size }: { name: string; color?: string | null; size?: "xs" | "lg" }) {
-  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+  // Letters only, so "[TEST] Reviewer" gives "TR", not "[R".
+  const initials = name.split(/\s+/).map((w) => w.replace(/[^\p{L}\p{N}]/gu, "")).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
   return (
     <span className={["avatar", size].filter(Boolean).join(" ")} style={{ ["--av" as string]: color ?? "#5B7290" }} title={name}>
       {initials}

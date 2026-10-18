@@ -85,6 +85,7 @@ public final class DiscussionRecords {
         List<Attachment> findByTicketIdAndDeletedAtIsNullOrderByUploadedAtAscIdAsc(Long ticketId);
         List<Attachment> findByCommentIdInAndDeletedAtIsNullOrderByIdAsc(Collection<Long> commentIds);
         List<Attachment> findByCommentIdAndDeletedAtIsNull(Long commentId);
+        List<Attachment> findByTicketIdAndPurposeAndDeletedAtIsNullOrderByUploadedAtAscIdAsc(Long ticketId, Purpose purpose);
         int countByTicketIdAndDeletedAtIsNull(Long ticketId);
     }
 }

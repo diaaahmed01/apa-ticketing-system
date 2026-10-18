@@ -1,6 +1,6 @@
 # ATS - APA Ticketing System
 
-ATS is the ticketing system for the Port of Alexandria. Port support staff and the vendor team raise bugs and change requests against the port's systems, and each ticket moves through a fixed workflow: work, code review, testing, deployment and production verification. Roles and permissions are configurable, people get in-app and email notifications, and a dashboard shows where tickets stand.
+ATS is the ticketing system for the Port of Alexandria. Port support staff and the vendor team raise bugs and change requests against the port's systems, and each ticket moves through a fixed workflow: work, code review, testing, deployment and production verification. Roles and permissions are configurable, ticket updates reach people as in-app notifications (email goes out only when a ticket is created, to the vendor side), and a dashboard shows where tickets stand.
 
 ## Stack
 
@@ -54,6 +54,7 @@ Defaults are in `backend/src/main/resources/application.yml`.
 | `ATS_MAIL_USERNAME` | empty | SMTP login. Leave blank for no login |
 | `ATS_MAIL_PASSWORD` | empty | SMTP password |
 | `ATS_MAIL_STARTTLS` | `false` | Use STARTTLS |
+| `ATS_MAIL_VENDOR_RECIPIENTS` | empty | Extra addresses (comma-separated) that get the new-ticket email, besides the active HQ users who have an address |
 
 Generate a JWT secret of at least 64 random bytes, base64 encoded:
 
@@ -129,6 +130,14 @@ Statuses, in order: Open, In Progress, Code Review, Testing, Ready for Deploymen
 - A ticket can be cancelled (Cancelled) or closed unresolved at any time, with a reason.
 - Blocking a ticket needs a reason and what it is waiting for (another ticket or a patch). Unblocking returns it to where it was.
 - Who may do each step is set per role under Administration, Roles and Permissions. These rules apply whatever the grants say.
+
+## Notifications and email
+
+- All regular ticket updates (assigned, review, test result, status change, comment and so on) are **in-app only**. They show in the bell and on the Notifications page and are never emailed.
+- The one email ATS sends is a **new-ticket notice to the external solutions company**. It is queued when a ticket is created, including the follow-up ticket opened by a failed production verification.
+- Recipients: every active user in the HQ organization (`VENDOR`) who has an email address, plus the addresses in `ATS_MAIL_VENDOR_RECIPIENTS`. Addresses are trimmed, checked, and de-duplicated ignoring case; the person who created the ticket is left out.
+- Subject: `[ATS] New ticket TKT-<id>: <title>`. The plain-text body has the ticket number and title, type, priority, module, environment, who created it, the assignee (or Unassigned), the first 2,000 characters of the description, and a link to the ticket (built from `ATS_PUBLIC_URL`). Follow-ups say which ticket they follow up.
+- Emails are written to `ATS_EMAIL_OUTBOX` in the same transaction as the ticket and sent by a background job only while `ATS_MAIL_ENABLED=true`. While it is `false` they stay queued.
 
 ## Production checklist
 

@@ -3,15 +3,17 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, type ModuleView } from "@/lib/api";
+import { useSession } from "@/lib/session";
 import { AttachButton, StagedList, useStagedFiles } from "./FileBits";
 import { Avatar, Icon } from "./Icon";
 import { Modal } from "./Modal";
+import { PriorityBars } from "./TicketBits";
 import { toast } from "./Toast";
 import { UserPicker } from "./UserPicker";
 import {
-  ACTION_LABEL, CLOSURE_LABEL, FILE_HINT, PRIMARY_ACTIONS, fmtDate, parseTicketNo, ticketNo,
-  type DirectoryEntry, type TicketDetail, type WorkflowAction,
+  ACTION_LABEL, CLOSURE_LABEL, ENV_LABEL, FILE_HINT, PRIMARY_ACTIONS, PRIORITIES, PRIORITY_LABEL, TYPE_LABEL, fmtDate, isArabic, parseTicketNo, ticketNo,
+  type DirectoryEntry, type Environment, type Priority, type TicketDetail, type TicketType, type WorkflowAction,
 } from "@/lib/tickets";
 
 type VerifyResponse = { ticket: TicketDetail; followUpId: number | null };
@@ -23,11 +25,13 @@ const MAX_REASON = 2000;
  * Workflow actions, the Blocked / Closed banners and the "testing passed" badge.
  * The server decides which actions are offered (`t.actions`) and enforces all of them.
  */
-export function WorkflowPanel({ t, people, onUpdated, onStale }: {
+export function WorkflowPanel({ t, people, onUpdated, onStale, openRequest }: {
   t: TicketDetail;
   people: DirectoryEntry[];
   onUpdated: (t: TicketDetail) => void;
   onStale: () => void;
+  /** Another part of the page (the workflow tabs) asks for an action modal; a new `seq` opens it. */
+  openRequest?: { action: WorkflowAction; seq: number } | null;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState<WorkflowAction | null>(null);
@@ -41,6 +45,12 @@ export function WorkflowPanel({ t, people, onUpdated, onStale }: {
   const more = available.filter((a) => a !== primary);
 
   function show(a: WorkflowAction) { setError(null); setOpen(a); }
+  const lastSeq = useRef(0);
+  useEffect(() => {
+    if (!openRequest || openRequest.seq === lastSeq.current) return;
+    lastSeq.current = openRequest.seq;
+    if (t.actions.includes(openRequest.action)) { setError(null); setOpen(openRequest.action); }
+  }, [openRequest, t.actions]);
   function close() { if (!busy) { setOpen(null); setError(null); } }
 
   const run: Run = async (action, body, ok) => {
@@ -130,7 +140,7 @@ export function WorkflowPanel({ t, people, onUpdated, onStale }: {
           await run("test-result", { result: pos ? "PASS" : "FAIL", reason }, pos ? "Testing passed" : "Testing failed");
         }} />}
       {open === "mark-deployed" && <DeployForm t={t} run={run} {...shell} />}
-      {open === "verify" && <VerifyForm t={t} run={run} {...shell} />}
+      {open === "verify" && <VerifyForm t={t} people={people} run={run} {...shell} />}
       {open === "block" && <BlockForm run={run} {...shell} />}
       {open === "unblock" && <ReasonForm {...shell} title="Unblock ticket"
         description={`${ticketNo(t.id)} goes back to ${t.statusBeforeBlock ? statusWord(t.statusBeforeBlock) : "where it was"}. Make sure what it was waiting for is done.`}
@@ -432,30 +442,103 @@ function DeployForm({ t, run, ...shell }: ShellProps & { t: TicketDetail; run: R
   );
 }
 
-function VerifyForm({ t, run, ...shell }: ShellProps & { t: TicketDetail; run: Run }) {
+/** Pass closes as Resolved. Fail closes as Unresolved and opens a follow-up ticket that can be reviewed (and edited) first. */
+function VerifyForm({ t, people, run, ...shell }: ShellProps & { t: TicketDetail; people: DirectoryEntry[]; run: Run }) {
+  const { me } = useSession();
   const [pass, setPass] = useState<boolean | null>(null);
   const [reason, setReason] = useState("");
   const [title, setTitle] = useState(("Follow-up: " + t.title).slice(0, 200));
+  const [descEdited, setDescEdited] = useState(false);
+  const [descText, setDescText] = useState("");
+  const [type, setType] = useState<TicketType>(t.type);
+  const [priority, setPriority] = useState<Priority>(t.priority);
+  const [moduleId, setModuleId] = useState<number>(t.module.id);
+  const [env, setEnv] = useState<Environment>(t.environment);
+  const [assigneeId, setAssigneeId] = useState<number | null>(t.assignee?.id ?? null);
+  const [modules, setModules] = useState<ModuleView[]>([]);
+  useEffect(() => { api.get<ModuleView[]>("/api/modules").then(setModules).catch(() => {}); }, []);
+
+  // The description follows the failure reason until the user writes their own.
+  const autoDesc = reason.trim() ? `${t.description}\n\n— Production verification failed: ${reason.trim()}` : t.description;
+  const description = descEdited ? descText : autoDesc;
+  const mayAssign = (me?.permissions["ASSIGN_TICKET"]?.length ?? 0) > 0;
+  const moduleOptions = modules.some((m) => m.id === t.module.id)
+    ? modules
+    : [{ id: t.module.id, name: t.module.name + " (inactive)", nameAr: null, active: false, sortOrder: 0 }, ...modules];
+  const tooLong = description.length > 20000;
+  const failOk = reason.trim().length > 0 && title.trim().length > 0 && description.trim().length > 0 && !tooLong;
+
   return (
     <Shell {...shell} wide title="Verify in production" danger={pass === false}
-      submit={pass === false ? "Fail and open follow-up" : "Pass and close"}
-      canSubmit={pass !== null && (pass || (reason.trim().length > 0 && title.trim().length > 0))}
+      submit={pass === false ? "Close as Unresolved & open follow-up" : "Pass and close"}
+      canSubmit={pass !== null && (pass || failOk)}
       description="Check the fix on the live system."
-      onSubmit={() => run("verify", pass ? { result: "PASS", reason: reason.trim() } : { result: "FAIL", reason: reason.trim(), followUpTitle: title.trim() },
-        "Verified. Ticket resolved")}>
+      onSubmit={() => run("verify", pass ? { result: "PASS", reason: reason.trim() } : {
+        result: "FAIL",
+        reason: reason.trim(),
+        followUp: { title: title.trim(), description: description.trim(), type, priority, moduleId, environment: env, assigneeId, unassigned: assigneeId == null },
+      }, "Verified. Ticket resolved")}>
       <Choice yes="Pass" no="Fail" yesHint="Closes as Resolved" noHint="Closes as Unresolved" value={pass} onChange={setPass} />
       {pass === true && <ReasonField id="wf-reason" label="Note" value={reason} onChange={setReason} />}
       {pass === false && (
         <>
-          <ReasonField id="wf-reason" label="What's still wrong?" value={reason} onChange={setReason} required />
-          <div className="field">
-            <label htmlFor="wf-follow">Follow-up ticket title</label>
-            <input id="wf-follow" className="input" dir="auto" value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} />
-          </div>
+          <ReasonField id="wf-reason" label="Failure reason: what's still wrong?" value={reason} onChange={setReason} required />
+
+          <h3 className="tab-h" style={{ margin: "6px 0 -4px" }}>New related ticket</h3>
           <p className="wf-note">
             <Icon name="info" size="sm" />
-            <span>{ticketNo(t.id)} will close as <b>Unresolved</b> and a new linked ticket will open with the same type, priority, module and environment, assigned to the same person.</span>
+            <span>{ticketNo(t.id)} will close as <b>Unresolved</b> and stay Unresolved even after the new ticket is fixed.</span>
           </p>
+          <div className="form-grid">
+            <div className="field span-2">
+              <label htmlFor="fu-title">Title</label>
+              <input id="fu-title" className={"input" + (isArabic(title) ? " ar" : "")} dir="auto" value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} />
+            </div>
+            <div className="field span-2">
+              <label htmlFor="fu-desc">Description <span className="opt num">{description.length.toLocaleString()} / 20,000</span></label>
+              <textarea id="fu-desc" className={"textarea" + (isArabic(description) ? " ar" : "")} dir="auto" rows={6} value={description}
+                onChange={(e) => { setDescText(e.target.value); setDescEdited(true); }} />
+              {tooLong && <span className="err">The description is too long. Shorten it before opening the follow-up.</span>}
+            </div>
+            <div className="field">
+              <span className="field-label">Type</span>
+              <div className="seg" role="group" aria-label="Type">
+                {(Object.keys(TYPE_LABEL) as TicketType[]).map((v) => <button key={v} type="button" aria-pressed={type === v} onClick={() => setType(v)}>{TYPE_LABEL[v]}</button>)}
+              </div>
+            </div>
+            <div className="field">
+              <span className="field-label">Environment</span>
+              <div className="seg" role="group" aria-label="Environment">
+                {(Object.keys(ENV_LABEL) as Environment[]).map((v) => (
+                  <button key={v} type="button" aria-pressed={env === v} onClick={() => setEnv(v)}>
+                    <span className={"env-dot" + (v === "PRODUCTION" ? " prod" : "")} />{ENV_LABEL[v]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="field span-2">
+              <span className="field-label">Priority</span>
+              <div className="prio-pick" role="radiogroup" aria-label="Priority">
+                {PRIORITIES.map((p) => (
+                  <button key={p} type="button" role="radio" aria-checked={priority === p} className={"prio-opt " + p.toLowerCase()} onClick={() => setPriority(p)}>
+                    <PriorityBars level={p} />{PRIORITY_LABEL[p]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="field span-2">
+              <label htmlFor="fu-module">Module</label>
+              <select id="fu-module" className="input" value={moduleId} onChange={(e) => setModuleId(Number(e.target.value))}>
+                {moduleOptions.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+            </div>
+            <div className="field span-2">
+              <label htmlFor="fu-assignee">Assignee <span className="opt">review before saving</span></label>
+              <UserPicker id="fu-assignee" people={people} value={assigneeId} onChange={setAssigneeId} prefer={["DEVELOPER"]}
+                disabled={!mayAssign} placeholder="Leave unassigned" />
+              {!mayAssign && <span className="hint">You can&apos;t change assignees. The follow-up keeps the current one.</span>}
+            </div>
+          </div>
         </>
       )}
     </Shell>

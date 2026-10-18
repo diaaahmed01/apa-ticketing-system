@@ -25,10 +25,12 @@ public record AtsProperties(Db db, Security security, BootstrapAdmin bootstrapAd
     public record Attachments(String dir, int maxMb) {}
 
     /**
-     * Outgoing mail. Sending is off by default; notifications are queued in ATS_EMAIL_OUTBOX either way.
+     * Outgoing mail. Sending is off by default; emails are queued in ATS_EMAIL_OUTBOX either way. The only emails ATS
+     * queues are new-ticket notices to the vendor side: active VENDOR users plus {@code vendorRecipients}.
      * With a blank {@code username} the SMTP login step is skipped.
      */
-    public record Mail(boolean enabled, String host, int port, String from, String username, String password, boolean starttls) {
+    public record Mail(boolean enabled, String host, int port, String from, String username, String password, boolean starttls,
+                       List<String> vendorRecipients) {
 
         /** Never prints the password. */
         @Override

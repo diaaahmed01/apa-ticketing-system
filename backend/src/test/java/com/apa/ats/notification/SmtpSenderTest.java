@@ -58,7 +58,7 @@ class SmtpSenderTest {
         }
 
         Mail mail() {
-            return new Mail(true, "127.0.0.1", server.getLocalPort(), "ATS <ats@example.org>", "", "", false);
+            return new Mail(true, "127.0.0.1", server.getLocalPort(), "ATS <ats@example.org>", "", "", false, java.util.List.of());
         }
 
         @Override

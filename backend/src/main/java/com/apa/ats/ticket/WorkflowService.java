@@ -2,6 +2,7 @@ package com.apa.ats.ticket;
 
 import com.apa.ats.auth.CurrentUser;
 import com.apa.ats.common.ApiException;
+import com.apa.ats.notification.TicketMailer;
 import com.apa.ats.permission.AccessGuard;
 import com.apa.ats.permission.Condition;
 import com.apa.ats.ticket.TicketEnums.Closure;
@@ -38,8 +39,13 @@ public class WorkflowService {
     private final TicketRecords.Links links;
     private final AccessGuard guard;
     private final TicketNotifier notifier;
+    private final TicketMailer mailer;
 
     public record VerifyResult(Detail ticket, Long followUpId) {}
+
+    /** Optional edits to the follow-up ticket opened by a failed verification; blank fields keep the copied defaults. */
+    public record FollowUpInput(String title, String description, String type, String priority, Long moduleId,
+                                String environment, Long assigneeId, boolean unassigned) {}
 
     /** The ticket being moved, with everything the checks need. */
     private record Ctx(Ticket t, CurrentUser me, List<TicketPerson> ps, Set<Condition> rel, Lookup l) {
@@ -180,7 +186,7 @@ public class WorkflowService {
     }
 
     @Transactional
-    public VerifyResult verify(Long id, Integer version, String result, String reason, String followUpTitle) {
+    public VerifyResult verify(Long id, Integer version, String result, String reason, String followUpTitle, FollowUpInput followUp) {
         Ctx c = open(id, version, Status.PRODUCTION_VERIFICATION);
         guard.require("VERIFY_RECORD_RESULT", c.rel());
         boolean pass = passFail(result, "PASS", "FAIL");
@@ -193,12 +199,15 @@ public class WorkflowService {
             return new VerifyResult(d, null);
         }
         guard.require("VERIFY_CREATE_RELATED", c.rel());
-        Ticket next = followUp(c, why, followUpTitle);
+        Ticket next = followUp(c, why, followUpTitle, followUp);
         closeAs(c, Closure.UNRESOLVED, why);
         tickets.log(c.id(), c.me().id(), "VERIFICATION_FAILED", null, null, "TKT-" + next.getId(), null);
         tickets.log(c.id(), c.me().id(), "FOLLOW_UP_CREATED", "followUp", null, "TKT-" + next.getId(), null);
         Detail d = done(c);
         notifier.verificationFailed(c.t(), next, c.l(), c.me().id(), why);
+        if (next.getAssigneeId() != null && !next.getAssigneeId().equals(c.t().getAssigneeId())) {
+            notifier.assigned(next, c.l(), c.me().id(), next.getAssigneeId());
+        }
         return new VerifyResult(d, next.getId());
     }
 
@@ -421,27 +430,50 @@ public class WorkflowService {
         }
     }
 
-    /** Opens the follow-up ticket for a failed production verification and links it to the original. */
-    private Ticket followUp(Ctx c, String reason, String requestedTitle) {
+    /**
+     * Opens the follow-up ticket for a failed production verification and links it to the original.
+     * Anything the caller leaves out falls back to a copy of the original (title "Follow-up: ...", description =
+     * the reason plus a reference, same assignee).
+     */
+    private Ticket followUp(Ctx c, String reason, String requestedTitle, FollowUpInput in) {
         Ticket o = c.t();
         Instant now = Instant.now();
-        String title = requestedTitle == null || requestedTitle.isBlank() ? "Follow-up: " + o.getTitle() : requestedTitle;
-        title = title.strip().replaceAll("\\s+", " ");
-        if (title.length() > 200) title = title.substring(0, 200).strip();
+        Lookup l = c.l();
+        FollowUpInput f = in == null ? new FollowUpInput(null, null, null, null, null, null, null, false) : in;
+
+        String title;
+        if (!blank(f.title())) {
+            title = TicketService.title(f.title());
+        } else {
+            title = blank(requestedTitle) ? "Follow-up: " + o.getTitle() : requestedTitle;
+            title = title.strip().replaceAll("\\s+", " ");
+            if (title.length() > 200) title = title.substring(0, 200).strip();
+        }
 
         Ticket n = new Ticket();
         n.setTitle(title);
-        n.setDescription(reason + "\n\nFollow-up of TKT-" + o.getId() + " (failed production verification).");
-        n.setType(o.getType());
-        n.setPriority(o.getPriority());
-        n.setModuleId(o.getModuleId());
-        n.setEnvironment(o.getEnvironment());
+        n.setDescription(!blank(f.description()) ? TicketService.description(f.description())
+                : reason + "\n\nFollow-up of TKT-" + o.getId() + " (failed production verification).");
+        n.setType(!blank(f.type()) ? TicketService.parse(TicketEnums.Type.class, f.type(), "type") : o.getType());
+        n.setPriority(!blank(f.priority()) ? TicketService.parse(TicketEnums.Priority.class, f.priority(), "priority") : o.getPriority());
+        n.setModuleId(f.moduleId() != null ? TicketService.activeModule(f.moduleId(), l).id() : o.getModuleId());
+        n.setEnvironment(!blank(f.environment()) ? TicketService.parse(TicketEnums.Environment.class, f.environment(), "environment") : o.getEnvironment());
         n.setStatus(Status.OPEN);
         n.setCreatedBy(c.me().id());
         n.setCreatedAt(now);
-        var assignee = o.getAssigneeId() == null ? null : c.l().users().get(o.getAssigneeId());
-        if (assignee != null && assignee.active()) {
-            n.setAssigneeId(assignee.id());
+
+        Long assigneeId = null;
+        if (f.unassigned()) {
+            assigneeId = null;
+        } else if (f.assigneeId() != null) {
+            if (!f.assigneeId().equals(o.getAssigneeId())) guard.require("ASSIGN_TICKET", c.rel());
+            assigneeId = TicketService.activeUser(f.assigneeId(), l, "assignee").id();
+        } else {
+            var carried = o.getAssigneeId() == null ? null : l.users().get(o.getAssigneeId());
+            if (carried != null && carried.active()) assigneeId = carried.id();
+        }
+        if (assigneeId != null) {
+            n.setAssigneeId(assigneeId);
             n.setAssignedBy(c.me().id());
             n.setAssignedAt(now);
         }
@@ -456,7 +488,12 @@ public class WorkflowService {
         links.save(k);
 
         tickets.log(n.getId(), c.me().id(), "CREATED", null, null, null, "Follow-up of TKT-" + o.getId());
-        if (n.getAssigneeId() != null) tickets.log(n.getId(), c.me().id(), "ASSIGNEE_CHANGED", "assignee", null, c.l().name(n.getAssigneeId()), null);
+        if (n.getAssigneeId() != null) tickets.log(n.getId(), c.me().id(), "ASSIGNEE_CHANGED", "assignee", null, l.name(n.getAssigneeId()), null);
+        mailer.ticketCreated(n, l, o.getId());
         return n;
+    }
+
+    private static boolean blank(String s) {
+        return s == null || s.isBlank();
     }
 }

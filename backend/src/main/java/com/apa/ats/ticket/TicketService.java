@@ -5,6 +5,7 @@ import com.apa.ats.common.ApiException;
 import com.apa.ats.common.ReferenceCache;
 import com.apa.ats.common.ReferenceCache.ModuleSnap;
 import com.apa.ats.common.ReferenceCache.UserSnap;
+import com.apa.ats.notification.TicketMailer;
 import com.apa.ats.permission.AccessGuard;
 import com.apa.ats.permission.Condition;
 import com.apa.ats.ticket.TicketEnums.Environment;
@@ -55,6 +56,7 @@ public class TicketService {
     private final DiscussionRecords.Comments comments;
     private final DiscussionRecords.Attachments attachments;
     private final TicketNotifier notifier;
+    private final TicketMailer mailer;
 
     /* ------------------------------------------------------------------ inputs */
 
@@ -150,6 +152,7 @@ public class TicketService {
                 linkRelated(t, other, me.id(), now);
             }
         }
+        mailer.ticketCreated(t, l, null);
         return toDetail(t, l);
     }
 
@@ -454,7 +457,7 @@ public class TicketService {
         t.setUpdatedBy(actor);
     }
 
-    private static ModuleSnap activeModule(Long id, Lookup l) {
+    static ModuleSnap activeModule(Long id, Lookup l) {
         if (id == null) throw ApiException.badRequest("REQUIRED", "Choose a module.");
         ModuleSnap m = l.modules().get(id);
         if (m == null || !m.active()) throw ApiException.badRequest("BAD_MODULE", "That module isn't available. Pick another one.");
@@ -467,14 +470,14 @@ public class TicketService {
         return u;
     }
 
-    private static String title(String v) {
+    static String title(String v) {
         if (v == null || v.isBlank()) throw ApiException.badRequest("REQUIRED", "Give the ticket a title.");
         String s = v.strip().replaceAll("\\s+", " ");
         if (s.length() > 200) throw ApiException.badRequest("TOO_LONG", "Keep the title under 200 characters.");
         return s;
     }
 
-    private static String description(String v) {
+    static String description(String v) {
         if (v == null || v.isBlank()) throw ApiException.badRequest("REQUIRED", "Describe the issue: what happened and where.");
         String s = v.strip();
         if (s.length() > 20000) throw ApiException.badRequest("TOO_LONG", "The description is too long (20,000 characters max). Attach a file instead.");
