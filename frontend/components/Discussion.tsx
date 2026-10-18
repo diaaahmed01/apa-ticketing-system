@@ -5,6 +5,8 @@ import { api, ApiError } from "@/lib/api";
 import { Avatar, Icon, type IconName } from "./Icon";
 import { AttachButton, AttachmentChip, FileIcon, Lightbox, StagedList, namePasted, useDropZone, useStagedFiles } from "./FileBits";
 import { Modal } from "./Modal";
+import { CommentsSkeleton, RowsSkeleton } from "./Skeletons";
+import { Spinner } from "./Spinner";
 import { toast } from "./Toast";
 import {
   FILE_HINT, attachmentUrl, checkFiles, fmtDate, fmtSize, isArabic, relTime,
@@ -73,7 +75,7 @@ export function CommentsTab({ t, onChanged }: { t: TicketDetail; onChanged: () =
   return (
     <section className="tab-panel cm-tab" aria-label="Comments">
       {error && <p className="err" role="alert"><Icon name="alert" size="xs" />{error}</p>}
-      {!items && !error && <div className="panel cm-skel" aria-busy="true" />}
+      {!items && !error && <CommentsSkeleton />}
       {items && items.length === 0 && (
         <div className="empty panel">
           <Icon name="message" />
@@ -100,7 +102,7 @@ export function CommentsTab({ t, onChanged }: { t: TicketDetail; onChanged: () =
         description="It will show as deleted for everyone, and any files sent with it are removed from the ticket."
         footer={<>
           <button className="btn ghost" type="button" disabled={busy} onClick={() => setDeleting(null)}>Cancel</button>
-          <button className="btn danger" type="button" disabled={busy} onClick={() => deleting && remove(deleting)}>{busy ? "Deleting…" : "Delete comment"}</button>
+          <button className={"btn danger" + (busy ? " is-busy" : "")} type="button" disabled={busy} onClick={() => deleting && remove(deleting)}>{busy && <Spinner />}{busy ? "Deleting…" : "Delete comment"}</button>
         </>}
       />
     </section>
@@ -182,7 +184,7 @@ function CommentEditor({ c, onCancel, onSaved, onGone }: { c: CommentView; onCan
       {error && <p className="err" role="alert"><Icon name="alert" size="xs" />{error}</p>}
       <div className="cm-edit-actions">
         <button className="btn ghost sm" type="button" onClick={onCancel} disabled={busy}>Cancel</button>
-        <button className="btn primary sm" type="button" onClick={save} disabled={!ready || busy}>{busy ? "Saving…" : "Save"}</button>
+        <button className={"btn primary sm" + (busy ? " is-busy" : "")} type="button" onClick={save} disabled={!ready || busy}>{busy && <Spinner />}{busy ? "Saving…" : "Save"}</button>
       </div>
     </div>
   );
@@ -250,7 +252,7 @@ function Composer({ t, onPosted }: { t: TicketDetail; onPosted: (c: CommentView)
       <div className="composer-bar">
         {t.canUpload ? <AttachButton onFiles={staged.add} disabled={busy} /> : <span />}
         <span className="composer-hint">Everyone on the ticket can see comments · Ctrl+Enter to send</span>
-        <button className="btn primary sm" type="button" onClick={send} disabled={!ready}>{busy ? "Posting…" : "Post comment"}</button>
+        <button className={"btn primary sm" + (busy ? " is-busy" : "")} type="button" onClick={send} disabled={!ready}>{busy && <Spinner />}{busy ? "Posting…" : "Post comment"}</button>
       </div>
       {drop.over && <div className="drop-veil" aria-hidden="true"><Icon name="upload" />Drop files to attach</div>}
     </div>
@@ -313,7 +315,7 @@ export function AttachmentsTab({ t, onChanged, onShowComment }: { t: TicketDetai
         <div className={"dropzone" + (drop.over ? " is-over" : "")} {...drop.props}>
           <Icon name="upload" />
           <div className="dropzone-text">
-            <b>{uploading ? "Uploading…" : "Drop files here to attach them to the ticket"}</b>
+            <b>{uploading ? <><Spinner /> Uploading…</> : "Drop files here to attach them to the ticket"}</b>
             <small>{FILE_HINT}</small>
           </div>
           <AttachButton onFiles={upload} disabled={uploading} label="Choose files" ghost={false} />
@@ -327,7 +329,7 @@ export function AttachmentsTab({ t, onChanged, onShowComment }: { t: TicketDetai
       {problem && <p className="err" role="alert" style={{ marginTop: 10 }}><Icon name="alert" size="xs" />{problem}</p>}
       {error && <p className="err" role="alert"><Icon name="alert" size="xs" />{error}</p>}
 
-      {!items && !error && <div className="panel cm-skel" aria-busy="true" style={{ marginTop: 16 }} />}
+      {!items && !error && <div style={{ marginTop: 16 }}><RowsSkeleton rows={2} label="Loading attachments" /></div>}
       {items && items.length === 0 && (
         <div className="empty panel" style={{ marginTop: 16 }}>
           <Icon name="clip" />
@@ -376,7 +378,7 @@ export function AttachmentsTab({ t, onChanged, onShowComment }: { t: TicketDetai
         description={deleting ? <>“<bdi>{deleting.fileName}</bdi>” will disappear from the ticket. The activity log keeps a record that it was removed.</> : undefined}
         footer={<>
           <button className="btn ghost" type="button" disabled={busy} onClick={() => setDeleting(null)}>Cancel</button>
-          <button className="btn danger" type="button" disabled={busy} onClick={() => deleting && remove(deleting)}>{busy ? "Removing…" : "Remove"}</button>
+          <button className={"btn danger" + (busy ? " is-busy" : "")} type="button" disabled={busy} onClick={() => deleting && remove(deleting)}>{busy && <Spinner />}{busy ? "Removing…" : "Remove"}</button>
         </>}
       />
     </section>

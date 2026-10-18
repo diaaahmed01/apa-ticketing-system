@@ -1,5 +1,6 @@
 "use client";
 
+import { Spinner } from "@/components/Spinner";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, ApiError, type Me } from "@/lib/api";
@@ -81,8 +82,8 @@ function ChangePasswordForm() {
           ))}
         </ul>
         {error && <p className="err" role="alert">{error}</p>}
-        <button className="btn primary lg auth-submit" type="submit" disabled={busy || !valid}>
-          {busy ? "Saving…" : "Save password and continue"}
+        <button className={"btn primary lg auth-submit" + (busy ? " is-busy" : "")} type="submit" disabled={busy || !valid}>
+          {busy && <Spinner />}{busy ? "Saving…" : "Save password and continue"}
         </button>
       </form>
     </AuthTicket>

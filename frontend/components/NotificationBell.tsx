@@ -7,6 +7,9 @@ import { api, ApiError } from "@/lib/api";
 import { useNotifications, typeMeta, type NotificationItem, type NotificationPage } from "@/lib/notifications";
 import { relTime } from "@/lib/tickets";
 import { Avatar, Icon } from "./Icon";
+import { startProgress } from "./NavProgress";
+import { RowsSkeleton } from "./Skeletons";
+import { Spinner } from "./Spinner";
 import { toast } from "./Toast";
 
 const LATEST = 8;
@@ -16,6 +19,7 @@ export function NotificationBell() {
   const router = useRouter();
   const { unread, setUnread, refresh } = useNotifications();
   const [open, setOpen] = useState(false);
+  const [readingAll, setReadingAll] = useState(false);
   const [items, setItems] = useState<NotificationItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const wrap = useRef<HTMLDivElement>(null);
@@ -75,16 +79,19 @@ export function NotificationBell() {
       setUnread(Math.max(0, unread - 1));
       api.post<{ unread: number }>(`/api/notifications/${n.id}/read`).then((r) => setUnread(r.unread)).catch(() => refresh());
     }
-    if (n.ticketId != null) router.push(`/tickets/${n.ticketId}`);
+    if (n.ticketId != null) { startProgress(); router.push(`/tickets/${n.ticketId}`); }
   }
 
   async function readAll() {
+    setReadingAll(true);
     try {
       await api.post("/api/notifications/read-all");
       setItems((l) => l?.map((x) => ({ ...x, read: true })) ?? l);
       setUnread(0);
     } catch (e) {
       toast(e instanceof ApiError ? e.message : "Couldn't mark them as read.", "error");
+    } finally {
+      setReadingAll(false);
     }
   }
 
@@ -120,7 +127,7 @@ export function NotificationBell() {
                 <button className="btn sm" type="button" onClick={() => { setError(null); load(); }}>Try again</button>
               </div>
             ) : !items ? (
-              <div className="skeleton-rows">{Array.from({ length: 4 }, (_, i) => <div key={i} className="skeleton" />)}</div>
+              <RowsSkeleton rows={4} panel={false} />
             ) : items.length === 0 ? (
               <div className="bell-empty">
                 <Icon name="inbox" />
@@ -148,8 +155,8 @@ export function NotificationBell() {
           </div>
 
           <div className="bell-foot">
-            <button className="btn ghost sm" type="button" onClick={readAll} disabled={unread === 0}>
-              <Icon name="checks" size="sm" />Mark all as read
+            <button className={"btn ghost sm" + (readingAll ? " is-busy" : "")} type="button" onClick={readAll} disabled={unread === 0 || readingAll}>
+              {readingAll ? <Spinner /> : <Icon name="checks" size="sm" />}Mark all as read
             </button>
             <Link className="btn sm" href="/notifications" onClick={() => setOpen(false)}>View all</Link>
           </div>

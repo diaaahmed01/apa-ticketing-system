@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/Icon";
+import { RowsSkeleton } from "@/components/Skeletons";
+import { Spinner } from "@/components/Spinner";
 import { fmtDate, fmtSize } from "@/lib/tickets";
 
 interface SettingsView {
@@ -62,7 +64,7 @@ export default function SettingsPage() {
       {loadError ? (
         <div className="empty panel"><h3>Settings didn&apos;t load</h3><p>{loadError}</p><button className="btn" type="button" onClick={load}>Try again</button></div>
       ) : !data ? (
-        <div className="panel"><div className="skeleton-rows">{Array.from({ length: 6 }, (_, i) => <div key={i} className="skeleton" />)}</div></div>
+        <RowsSkeleton rows={6} />
       ) : (
         <div className="settings-grid">
           <section className="panel" aria-labelledby="set-email">
@@ -169,7 +171,7 @@ function TestEmail({ enabled, onDone }: { enabled: boolean; onDone: () => void }
             <label htmlFor="test-to">Send to</label>
             <div className="test-mail">
               <input id="test-to" className="input" type="email" required autoComplete="email" placeholder="name@example.com" value={to} onChange={(e) => setTo(e.target.value)} />
-              <button className="btn primary" type="submit" disabled={busy || !to.trim()}>{busy ? "Sending…" : "Send test"}</button>
+              <button className={"btn primary" + (busy ? " is-busy" : "")} type="submit" disabled={busy || !to.trim()}>{busy && <Spinner />}{busy ? "Sending…" : "Send test"}</button>
             </div>
             <span className="hint">{enabled ? "Sent right away through the configured mail server." : "Email is off, so the message will only be queued."}</span>
           </div>

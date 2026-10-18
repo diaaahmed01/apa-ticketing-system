@@ -6,6 +6,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError, type ModuleView } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { Icon } from "./Icon";
+import { startProgress } from "./NavProgress";
+import { TicketGridSkeleton, TicketTableSkeleton } from "./Skeletons";
+import { Spinner } from "./Spinner";
 import { Person, PriorityBadge, StatusBadge, TicketCardView, TypeLabel } from "./TicketBits";
 import {
   CLOSURE_LABEL, ENV_LABEL, PRIORITY_LABEL, PRIORITIES, STATUS_LABEL, TYPE_LABEL, WORKFLOW, fmtDate, isArabic,
@@ -28,6 +31,7 @@ export function TicketList({ mine }: { mine: boolean }) {
   const [data, setData] = useState<PageOf<TicketCard> | null>(null);
   const [extra, setExtra] = useState<TicketCard[]>([]);
   const [loading, setLoading] = useState(true);
+  const [moreBusy, setMoreBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [people, setPeople] = useState<DirectoryEntry[]>([]);
   const [modules, setModules] = useState<ModuleView[]>([]);
@@ -85,11 +89,14 @@ export function TicketList({ mine }: { mine: boolean }) {
     const next = new URLSearchParams(query.toString());
     const nextPage = data.page + 1 + Math.floor(extra.length / PAGE);
     next.set("page", String(nextPage));
+    setMoreBusy(true);
     try {
       const more = await api.get<PageOf<TicketCard>>("/api/tickets?" + next.toString());
       setExtra((x) => [...x, ...more.items]);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Couldn't load more tickets.");
+    } finally {
+      setMoreBusy(false);
     }
   }
 
@@ -213,7 +220,7 @@ export function TicketList({ mine }: { mine: boolean }) {
       {error ? (
         <div className="empty panel"><h3>Tickets didn&apos;t load</h3><p>{error}</p><button className="btn" type="button" onClick={load}>Try again</button></div>
       ) : loading && !data ? (
-        <div className="ticket-grid">{Array.from({ length: 6 }, (_, i) => <div key={i} className="tk-skel" />)}</div>
+        view === "tickets" ? <TicketGridSkeleton /> : <TicketTableSkeleton />
       ) : items.length === 0 ? (
         <EmptyTickets filtered={hasFilters} mine={mine} canCreate={can("TICKET_CREATE")} onClear={() => { setQ(""); router.replace("?", { scroll: false }); }} />
       ) : view === "tickets" ? (
@@ -221,11 +228,11 @@ export function TicketList({ mine }: { mine: boolean }) {
           {items.map((t) => <TicketCardView key={t.id} t={t} />)}
         </section>
       ) : (
-        <TicketTable items={items} onOpen={(id) => router.push(`/tickets/${id}`)} />
+        <TicketTable items={items} onOpen={(id) => { startProgress(); router.push(`/tickets/${id}`); }} />
       )}
 
       {data && items.length < data.total && (
-        <div className="load-more"><button className="btn" type="button" onClick={loadMore}>Show {Math.min(PAGE, data.total - items.length)} more</button></div>
+        <div className="load-more"><button className={"btn" + (moreBusy ? " is-busy" : "")} type="button" onClick={loadMore} disabled={moreBusy}>{moreBusy && <Spinner />}Show {Math.min(PAGE, data.total - items.length)} more</button></div>
       )}
 
       {openKey && openKey !== "date" && openDef && (
@@ -341,6 +348,9 @@ function DatePopover({ anchor, from, to, onApply, onClose }: {
 }
 
 function TicketTable({ items, onOpen }: { items: TicketCard[]; onOpen: (id: number) => void }) {
+  // The clicked row looks pressed until the ticket page replaces this one.
+  const [opening, setOpening] = useState<number | null>(null);
+  const open = (id: number) => { setOpening(id); onOpen(id); };
   return (
     <section className="table-wrap" aria-label="Tickets table">
       <table className="data tickets">
@@ -349,7 +359,8 @@ function TicketTable({ items, onOpen }: { items: TicketCard[]; onOpen: (id: numb
         </thead>
         <tbody>
           {items.map((t) => (
-            <tr key={t.id} tabIndex={0} onClick={() => onOpen(t.id)} onKeyDown={(e) => { if (e.key === "Enter") onOpen(t.id); }}>
+            <tr key={t.id} tabIndex={0} className={opening === t.id ? "is-opening" : undefined} aria-busy={opening === t.id || undefined}
+              onClick={() => open(t.id)} onKeyDown={(e) => { if (e.key === "Enter") open(t.id); }}>
               <td><span className={"id-chip p-" + t.priority.toLowerCase()}>TKT-{t.id}</span></td>
               <td><div className={"t-title" + (isArabic(t.title) ? " ar" : "")} dir="auto" title={t.title}>{t.title}</div></td>
               <td><StatusBadge status={t.status} closure={t.closure} /></td>

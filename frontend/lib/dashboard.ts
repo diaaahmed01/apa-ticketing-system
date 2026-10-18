@@ -7,7 +7,11 @@ export interface Rate { bad: number; good: number; rate: number | null }
 export interface DashboardData {
   days: number;
   module: number | null;
+  environment: Environment | null;
+  priority: Priority | null;
   from: string;
+  /** total = created in the period, closed = closed in the period; the rest are current counts. */
+  kpis: { total: number; open: number; inProgress: number; testing: number; blocked: number; closed: number };
   totals: {
     open: number;
     byStatus: Partial<Record<Status, number>>;
@@ -26,6 +30,7 @@ export interface DashboardData {
   cycle: { medianDays: number | null; averageDays: number | null; count: number };
   myQueue: { ticket: TicketCard; reason: string }[];
   byAssignee: { top: { person: PersonRef; count: number }[]; unassigned: number };
+  recent: TicketCard[];
   generatedAt: string;
 }
 

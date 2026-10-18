@@ -9,6 +9,7 @@ import { useSession } from "@/lib/session";
 import { Avatar, Icon, type IconName } from "./Icon";
 import { NotificationBell } from "./NotificationBell";
 import { parseTicketNo } from "@/lib/tickets";
+import { startProgress } from "./NavProgress";
 
 interface NavItem { href: string; label: string; icon: IconName; permission?: string; soon?: boolean }
 
@@ -141,7 +142,9 @@ function GlobalSearch() {
     const text = input?.value.trim() ?? "";
     if (!text) return false;
     const no = parseTicketNo(text);
-    router.push(no !== null ? `/tickets/${no}` : "/tickets?q=" + encodeURIComponent(text));
+    const target = no !== null ? `/tickets/${no}` : "/tickets?q=" + encodeURIComponent(text);
+    if (target !== location.pathname + location.search) startProgress();
+    router.push(target);
     return true;
   }
 

@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { api, ApiError, type ModuleView } from "@/lib/api";
 import { useSession } from "@/lib/session";
+import { AttachButton, StagedList, namePasted, useDropZone, useStagedFiles } from "@/components/FileBits";
 import { Icon } from "@/components/Icon";
+import { Spinner } from "@/components/Spinner";
 import { PriorityBars, TicketCardView } from "@/components/TicketBits";
 import { UserPicker } from "@/components/UserPicker";
 import {
-  ENV_LABEL, PRIORITIES, PRIORITY_LABEL, TYPE_LABEL, isArabic,
+  ENV_LABEL, FILE_HINT, PRIORITIES, PRIORITY_LABEL, TYPE_LABEL, isArabic,
   type DirectoryEntry, type Environment, type Priority, type TicketCard, type TicketDetail, type TicketType,
 } from "@/lib/tickets";
 
@@ -42,6 +44,11 @@ export default function CreateTicketPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<TicketDetail | null>(null);
+  // Files are staged here and uploaded right after the ticket exists.
+  const staged = useStagedFiles();
+  const [phase, setPhase] = useState<"creating" | "uploading" | null>(null);
+  const [upload, setUpload] = useState<{ sent: number; failed: number }>({ sent: 0, failed: 0 });
+  const drop = useDropZone(staged.add, busy);
 
   useEffect(() => {
     api.get<ModuleView[]>("/api/modules").then(setModules).catch(() => {});
@@ -91,6 +98,14 @@ export default function CreateTicketPage() {
     createdAt: new Date().toISOString(),
   };
 
+  function onPaste(e: React.ClipboardEvent) {
+    const pasted = Array.from(e.clipboardData.files).filter((x) => x.type.startsWith("image/"));
+    // Text wins when both are on the clipboard (copying a spreadsheet cell puts an image there too).
+    if (pasted.length === 0 || e.clipboardData.getData("text/plain")) return;
+    e.preventDefault();
+    staged.add(pasted.map(namePasted));
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setTouched(true);
@@ -99,19 +114,40 @@ export default function CreateTicketPage() {
       return;
     }
     setBusy(true);
+    setPhase("creating");
     setError(null);
+    let t: TicketDetail;
     try {
-      const t = await api.post<TicketDetail>("/api/tickets", {
+      t = await api.post<TicketDetail>("/api/tickets", {
         title: d.title, description: d.description, type: d.type, priority: d.priority, moduleId: d.moduleId,
         environment: d.environment, assigneeId: d.assigneeId, reviewerId: d.reviewerId, testerId: d.testerId,
         collaboratorIds: d.collaboratorIds, patchReference: d.patchReference,
       });
-      setCreated(t);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "The ticket wasn't created. Try again.");
-    } finally {
       setBusy(false);
+      setPhase(null);
+      return;
     }
+
+    // The ticket exists now; a failed upload must not undo that, so it only changes what the success screen says.
+    const files = staged.files;
+    let failed = 0;
+    if (files.length > 0) {
+      setPhase("uploading");
+      try {
+        const fd = new FormData();
+        files.forEach((x) => fd.append("files", x));
+        fd.append("purpose", "GENERAL");
+        await api.upload(`/api/tickets/${t.id}/attachments`, fd);
+      } catch {
+        failed = files.length;
+      }
+    }
+    setUpload({ sent: files.length - failed, failed });
+    setCreated(t);
+    setBusy(false);
+    setPhase(null);
   }
 
   if (created) {
@@ -128,9 +164,18 @@ export default function CreateTicketPage() {
               {created.assignee ? <>It&apos;s assigned to <b>{created.assignee.fullName}</b>. </> : <>It&apos;s waiting for an assignee. </>}
               Everyone on the ticket can follow it from <b>My Tickets</b>.
             </p>
+            {upload.sent > 0 && (
+              <p className="issued-note" role="status"><Icon name="clip" size="sm" />{upload.sent} {upload.sent === 1 ? "file" : "files"} attached</p>
+            )}
+            {upload.failed > 0 && (
+              <p className="issued-note warn" role="alert">
+                <Icon name="alert" size="sm" />
+                <span>TKT-{created.id} was created, but {upload.failed} {upload.failed === 1 ? "file" : "files"} didn&apos;t upload. Add {upload.failed === 1 ? "it" : "them"} from the ticket&apos;s <Link href={`/tickets/${created.id}`}>Attachments tab</Link>.</span>
+              </p>
+            )}
             <div className="head-actions" style={{ justifyContent: "center" }}>
               <Link className="btn primary" href={`/tickets/${created.id}`}>Open the ticket<Icon name="arrowRight" size="sm" /></Link>
-              <button className="btn" type="button" onClick={() => { setCreated(null); setD(EMPTY); setTouched(false); }}>Create another</button>
+              <button className="btn" type="button" onClick={() => { setCreated(null); setD(EMPTY); setTouched(false); staged.clear(); setUpload({ sent: 0, failed: 0 }); }}>Create another</button>
             </div>
           </div>
         </div>
@@ -148,7 +193,7 @@ export default function CreateTicketPage() {
       </div>
 
       <div className="create-layout">
-        <form className="panel create-form" onSubmit={submit} noValidate>
+        <form className="panel create-form" onSubmit={submit} onPaste={onPaste} noValidate>
           <section className="form-section">
             <div className="field">
               <label htmlFor="t-title">Title</label>
@@ -260,24 +305,36 @@ export default function CreateTicketPage() {
               <label htmlFor="t-patch">Patch reference <span className="opt">optional</span></label>
               <input id="t-patch" className="input" value={d.patchReference} maxLength={100} onChange={(e) => set("patchReference", e.target.value)} placeholder="e.g. PATCH-2026.10.3" />
             </div>
-            <div className="field">
-              <span className="field-label">Attachments</span>
-              <div className="attach-later"><Icon name="clip" size="sm" />Add screenshots and logs on the ticket once it&apos;s created.</div>
+            <div className="field span-2">
+              <span className="field-label">Attachments <span className="opt">optional</span></span>
+              <div className="attach-field">
+                <div className={"dropzone" + (drop.over ? " is-over" : "")} aria-disabled={busy || undefined} {...drop.props}>
+                  <Icon name="upload" />
+                  <div className="dropzone-text">
+                    <b>Drop files here, or paste a screenshot</b>
+                    <small>{FILE_HINT}</small>
+                  </div>
+                  <AttachButton onFiles={staged.add} disabled={busy} label="Choose files" ghost={false} />
+                </div>
+                <StagedList files={staged.files} onRemove={staged.remove} disabled={busy} />
+                {staged.problem && <p className="err" role="alert"><Icon name="alert" size="xs" />{staged.problem}</p>}
+              </div>
             </div>
           </section>
 
           <div className="form-actions">
             {error && <p className="err" role="alert">{error}</p>}
             <button className="btn ghost" type="button" onClick={() => router.back()}>Cancel</button>
-            <button className="btn primary lg" type="submit" disabled={busy}>
-              <Icon name="ticket" size="sm" />{busy ? "Creating…" : "Create ticket"}
+            <button className={"btn primary lg" + (busy ? " is-busy" : "")} type="submit" disabled={busy}>
+              {busy ? <Spinner /> : <Icon name="ticket" size="sm" />}
+              {phase === "uploading" ? `Uploading ${staged.files.length} ${staged.files.length === 1 ? "file" : "files"}…` : busy ? "Creating ticket…" : "Create ticket"}
             </button>
           </div>
         </form>
 
         <aside className="create-preview" aria-label="Live ticket preview">
           <div className="preview-label"><span className="live-dot" />Live preview</div>
-          <TicketCardView t={preview} preview />
+          <TicketCardView t={preview} preview clips={staged.files.length} />
           <p className="preview-note">The ticket number is issued when you create it.</p>
         </aside>
       </div>

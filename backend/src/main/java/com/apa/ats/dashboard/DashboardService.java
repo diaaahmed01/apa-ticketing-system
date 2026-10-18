@@ -41,8 +41,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Dashboard numbers. Five grouped or light queries in total (open counts, created times, closed rows,
- * review/test/verify activity counts, the caller's queue); users and modules come from the cache.
+ * Dashboard numbers. Six grouped or light queries in total (open counts, created times, closed rows,
+ * review/test/verify activity counts, the caller's queue, the newest tickets); users and modules come from the cache.
  */
 @Service
 @RequiredArgsConstructor
@@ -51,6 +51,7 @@ public class DashboardService {
     private static final Set<Integer> PERIODS = Set.of(30, 90, 180, 365);
     private static final int QUEUE_LIMIT = 10;
     private static final int ASSIGNEE_LIMIT = 8;
+    private static final int RECENT_LIMIT = 6;
 
     @PersistenceContext
     private EntityManager em;
@@ -76,13 +77,17 @@ public class DashboardService {
 
     public record Assignees(List<AssigneeCount> top, long unassigned) {}
 
-    public record Dashboard(int days, Long module, Instant from, Totals totals, Map<String, Long> byPriority,
+    /** Headline cards: total = created in the period, closed = closed in the period, the rest are current counts. */
+    public record Kpis(long total, long open, long inProgress, long testing, long blocked, long closed) {}
+
+    public record Dashboard(int days, Long module, Environment environment, Priority priority, Instant from,
+                            Kpis kpis, Totals totals, Map<String, Long> byPriority,
                             List<ModuleCount> byModule, Map<String, Long> byType, Map<String, Long> byEnvironment,
                             List<WeekBucket> trend, Quality quality, Cycle cycle, List<QueueItem> myQueue,
-                            Assignees byAssignee, Instant generatedAt) {}
+                            Assignees byAssignee, List<Card> recent, Instant generatedAt) {}
 
     @Transactional(readOnly = true)
-    public Dashboard build(Long moduleId, int daysParam) {
+    public Dashboard build(Long moduleId, Environment env, Priority prio, int daysParam) {
         int days = PERIODS.contains(daysParam) ? daysParam : 90;
         Instant now = Instant.now();
         Instant from = now.minusSeconds(days * 86_400L);
@@ -94,9 +99,9 @@ public class DashboardService {
         // 1. Open tickets, grouped on every dimension the breakdowns need; rolled up here.
         List<Object[]> openRows = bind(em.createQuery(
                 "select t.status, t.priority, t.moduleId, t.type, t.environment, t.assigneeId, count(t) from Ticket t "
-                        + "where t.status <> :closed" + mod(moduleId) + " "
+                        + "where t.status <> :closed" + filt(moduleId, env, prio) + " "
                         + "group by t.status, t.priority, t.moduleId, t.type, t.environment, t.assigneeId", Object[].class)
-                .setParameter("closed", Status.CLOSED), moduleId).getResultList();
+                .setParameter("closed", Status.CLOSED), moduleId, env, prio).getResultList();
 
         Map<Status, Long> byStatus = new EnumMap<>(Status.class);
         Map<Priority, Long> byPriority = new EnumMap<>(Priority.class);
@@ -122,14 +127,14 @@ public class DashboardService {
 
         // 2. Creation times in the period (weekly buckets and the created count).
         List<Instant> created = bind(em.createQuery(
-                "select t.createdAt from Ticket t where t.createdAt >= :from" + mod(moduleId),
-                Instant.class).setParameter("from", from), moduleId).getResultList();
+                "select t.createdAt from Ticket t where t.createdAt >= :from" + filt(moduleId, env, prio),
+                Instant.class).setParameter("from", from), moduleId, env, prio).getResultList();
 
         // 3. Tickets closed in the period: closure, created and closed times.
         List<Object[]> closedRows = bind(em.createQuery(
                 "select t.closureStatus, t.createdAt, t.closedAt from Ticket t where t.status = :closed "
-                        + "and t.closedAt >= :from" + mod(moduleId), Object[].class)
-                .setParameter("closed", Status.CLOSED).setParameter("from", from), moduleId).getResultList();
+                        + "and t.closedAt >= :from" + filt(moduleId, env, prio), Object[].class)
+                .setParameter("closed", Status.CLOSED).setParameter("from", from), moduleId, env, prio).getResultList();
         long resolved = 0, unresolved = 0, cancelled = 0;
         List<Double> cycleDays = new ArrayList<>();
         List<Instant> closedAt = new ArrayList<>();
@@ -148,7 +153,7 @@ public class DashboardService {
         }
 
         // 4. Workflow outcomes from the activity log.
-        Map<String, Long> actions = activityCounts(from, moduleId);
+        Map<String, Long> actions = activityCounts(from, moduleId, env, prio);
         Quality quality = new Quality(
                 rate(actions, "REVIEW_REJECTED", "REVIEW_APPROVED"),
                 rate(actions, "TEST_FAILED", "TEST_PASSED"),
@@ -156,6 +161,14 @@ public class DashboardService {
 
         // 5. The caller's own queue (not narrowed by the module filter: it is what is waiting on them).
         List<QueueItem> queue = queue(me.id(), lookup);
+
+        // 6. The newest tickets matching the filters, as cards.
+        List<Card> recent = bind(em.createQuery("select t from Ticket t where 1 = 1" + filt(moduleId, env, prio)
+                + " order by t.createdAt desc, t.id desc", Ticket.class), moduleId, env, prio)
+                .setMaxResults(RECENT_LIMIT).getResultList().stream().map(t -> TicketViews.card(t, lookup)).toList();
+
+        Kpis kpis = new Kpis(created.size(), byStatus.get(Status.OPEN), byStatus.get(Status.IN_PROGRESS),
+                byStatus.get(Status.TESTING), byStatus.get(Status.BLOCKED), closedRows.size());
 
         Totals totals = new Totals(open, named(byStatus), new Closed(resolved, unresolved, cancelled, closedRows.size()),
                 created.size(), byPriority.get(Priority.CRITICAL), unassigned, byStatus.get(Status.BLOCKED));
@@ -167,16 +180,23 @@ public class DashboardService {
                 .sorted(Map.Entry.<Long, Long>comparingByValue().reversed().thenComparing(Map.Entry.comparingByKey()))
                 .limit(ASSIGNEE_LIMIT).map(e -> new AssigneeCount(lookup.person(e.getKey()), e.getValue())).toList();
 
-        return new Dashboard(days, moduleId, from, totals, named(byPriority), modules, named(byType), named(byEnv),
+        return new Dashboard(days, moduleId, env, prio, from, kpis, totals, named(byPriority), modules, named(byType), named(byEnv),
                 trend(from, now, zone, created, closedAt), quality, cycle(cycleDays), queue,
-                new Assignees(people, unassigned), now);
+                new Assignees(people, unassigned), recent, now);
     }
 
-    /** The module filter is added only when set: a null bind parameter has no reliable type on Oracle. */
-    private static String mod(Long moduleId) { return moduleId == null ? "" : " and t.moduleId = :module"; }
+    /** Filters are added only when set: a null bind parameter has no reliable type on Oracle. */
+    private static String filt(Long moduleId, Environment env, Priority prio) {
+        return (moduleId == null ? "" : " and t.moduleId = :module")
+                + (env == null ? "" : " and t.environment = :env")
+                + (prio == null ? "" : " and t.priority = :prio");
+    }
 
-    private static <T> TypedQuery<T> bind(TypedQuery<T> q, Long moduleId) {
-        return moduleId == null ? q : q.setParameter("module", moduleId);
+    private static <T> TypedQuery<T> bind(TypedQuery<T> q, Long moduleId, Environment env, Priority prio) {
+        if (moduleId != null) q.setParameter("module", moduleId);
+        if (env != null) q.setParameter("env", env);
+        if (prio != null) q.setParameter("prio", prio);
+        return q;
     }
 
     private static <K extends Enum<K>> Map<String, Long> named(Map<K, Long> m) {
@@ -185,17 +205,19 @@ public class DashboardService {
         return out;
     }
 
-    private Map<String, Long> activityCounts(Instant from, Long moduleId) {
+    private Map<String, Long> activityCounts(Instant from, Long moduleId, Environment env, Priority prio) {
         CriteriaBuilder cb = em.getCriteriaBuilder();
         CriteriaQuery<Tuple> q = cb.createTupleQuery();
         Root<TicketActivity> a = q.from(TicketActivity.class);
         List<Predicate> where = new ArrayList<>();
         where.add(a.get("action").in("REVIEW_APPROVED", "REVIEW_REJECTED", "TEST_PASSED", "TEST_FAILED", "VERIFIED", "VERIFICATION_FAILED"));
         where.add(cb.greaterThanOrEqualTo(a.<Instant>get("createdAt"), from));
-        if (moduleId != null) {
+        if (moduleId != null || env != null || prio != null) {
             Root<Ticket> t = q.from(Ticket.class);
             where.add(cb.equal(t.get("id"), a.get("ticketId")));
-            where.add(cb.equal(t.get("moduleId"), moduleId));
+            if (moduleId != null) where.add(cb.equal(t.get("moduleId"), moduleId));
+            if (env != null) where.add(cb.equal(t.get("environment"), env));
+            if (prio != null) where.add(cb.equal(t.get("priority"), prio));
         }
         q.multiselect(a.get("action").alias("action"), cb.count(a).alias("n"))
                 .where(where.toArray(Predicate[]::new)).groupBy(a.get("action"));

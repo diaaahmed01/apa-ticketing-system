@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { AttachmentChip, Lightbox } from "./FileBits";
 import { Avatar, Icon } from "./Icon";
+import { RowsSkeleton } from "./Skeletons";
 import { Person, StatusBadge, TicketCardView } from "./TicketBits";
 import { toast } from "./Toast";
 import {
@@ -58,9 +59,7 @@ function Gate({ wf, children }: { wf: WfState; children: (d: WorkflowData) => Re
   }
   if (!wf.data) {
     return (
-      <section className="panel tab-panel" aria-busy="true" aria-label="Loading">
-        <div className="skeleton-rows"><div className="skeleton" /><div className="skeleton" /><div className="skeleton" /></div>
-      </section>
+      <section className="tab-panel"><RowsSkeleton rows={3} /></section>
     );
   }
   return <section className="tab-panel wf-tab">{children(wf.data)}</section>;
@@ -439,7 +438,7 @@ export function DependenciesTab({ t, wf, onAction, onChange }: {
           <div className="wf-tab-actions"><button className="btn" type="button" onClick={wf.reload}>Try again</button></div>
         </div>
       ) : !wf.data ? (
-        <div className="panel tab-panel" aria-busy="true"><div className="skeleton-rows"><div className="skeleton" /></div></div>
+        <RowsSkeleton rows={1} />
       ) : current ? (
         <div className="wf-banner blocked">
           <span className="wf-banner-icon"><Icon name="blocked" /></span>

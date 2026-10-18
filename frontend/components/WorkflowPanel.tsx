@@ -8,6 +8,7 @@ import { useSession } from "@/lib/session";
 import { AttachButton, StagedList, useStagedFiles } from "./FileBits";
 import { Avatar, Icon } from "./Icon";
 import { Modal } from "./Modal";
+import { Spinner } from "./Spinner";
 import { PriorityBars } from "./TicketBits";
 import { toast } from "./Toast";
 import { UserPicker } from "./UserPicker";
@@ -265,8 +266,8 @@ function Shell({ title, description, submit, danger, canSubmit = true, onSubmit,
     <Modal open onClose={onClose} title={title} description={description} wide={wide}
       footer={<>
         <button className="btn ghost" type="button" onClick={onClose} disabled={busy}>Cancel</button>
-        <button className={"btn " + (danger ? "danger" : "primary")} type="button" disabled={busy || !canSubmit} onClick={onSubmit}>
-          {busy ? "Working…" : submit}
+        <button className={"btn " + (danger ? "danger" : "primary") + (busy ? " is-busy" : "")} type="button" disabled={busy || !canSubmit} onClick={onSubmit}>
+          {busy && <Spinner />}{busy ? "Working…" : submit}
         </button>
       </>}
     >

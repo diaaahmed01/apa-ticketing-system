@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { Avatar, Icon } from "./Icon";
 import { Perf, TicketPaper } from "./TicketPaper";
 import {
@@ -88,7 +89,9 @@ export function Person({ p, size = "xs", empty = "Unassigned", sub }: { p: Perso
 }
 
 /** The physical ticket card used in the grid and the dashboard. */
-export function TicketCardView({ t, preview }: { t: TicketCard; preview?: boolean }) {
+export function TicketCardView({ t, preview, clips }: { t: TicketCard; preview?: boolean; clips?: number }) {
+  // A plain click is acknowledged at once (pressed look) while the ticket page loads.
+  const [opening, setOpening] = useState(false);
   const closed = t.status === "CLOSED";
   const ar = isArabic(t.title);
   const inner = (
@@ -122,11 +125,26 @@ export function TicketCardView({ t, preview }: { t: TicketCard; preview?: boolea
         <div className="tk-foot">
           <Barcode seed={t.id} />
           <div className="meta"><b dir="auto">{t.creator.fullName}</b><br />{fmtDate(t.createdAt)}</div>
+          {clips !== undefined && clips > 0 && (
+            <span className="tk-clip" title={`${clips} ${clips === 1 ? "attachment" : "attachments"}`}><Icon name="clip" size="xs" />{clips}</span>
+          )}
           {!preview && <span className="go">View details <Icon name="arrowRight" size="xs" /></span>}
         </div>
       </TicketPaper>
   );
   return preview
     ? <div className="tk-link tk-preview" aria-label="Ticket preview">{inner}</div>
-    : <Link href={`/tickets/${t.id}`} className="tk-link" aria-label={`TKT-${t.id}: ${t.title}`}>{inner}</Link>;
+    : (
+      <Link
+        href={`/tickets/${t.id}`}
+        className={"tk-link" + (opening ? " is-opening" : "")}
+        aria-label={`TKT-${t.id}: ${t.title}`}
+        aria-busy={opening || undefined}
+        onClick={(e) => {
+          if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+          setOpening(true);
+          setTimeout(() => setOpening(false), 10_000); // if the page never arrives, drop the pressed look
+        }}
+      >{inner}</Link>
+    );
 }

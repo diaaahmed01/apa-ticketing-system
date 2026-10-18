@@ -619,8 +619,6 @@ table.data tbody tr:hover { background: #FAFBFD; }
 .footnote { display: flex; align-items: center; gap: 6px; margin-top: 12px; font-size: 12.5px; color: var(--muted-2); }
 
 .skeleton-rows { padding: 12px 16px; display: flex; flex-direction: column; gap: 12px; }
-.skeleton { height: 36px; border-radius: 8px; background: linear-gradient(90deg, #EEF2F6 0%, #F7F9FB 50%, #EEF2F6 100%); background-size: 200% 100%; animation: shimmer 1.4s ease-in-out infinite; }
-@keyframes shimmer { to { background-position: -200% 0; } }
 
 .toast.error .icon { color: #FF9C94; }
 @media (max-width: 720px) { .form-grid { grid-template-columns: 1fr; } .local-search { width: 100%; } }
@@ -671,7 +669,6 @@ table.data tbody tr:focus-visible { outline: 2px solid var(--blue); outline-offs
 .id-chip.p-critical { --c: var(--p-critical); } .id-chip.p-high { --c: var(--p-high); } .id-chip.p-medium { --c: var(--p-medium); }
 .cell-flex { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .cell-flex .icon { color: var(--muted); }
-.tk-skel { height: 330px; border-radius: var(--r-lg); background: linear-gradient(90deg, #EEF2F6 0%, #F7F9FB 50%, #EEF2F6 100%); background-size: 200% 100%; animation: shimmer 1.4s ease-in-out infinite; }
 
 /* ==========================================================================
    Person picker
@@ -770,7 +767,6 @@ table.data tbody tr:focus-visible { outline: 2px solid var(--blue); outline-offs
 .back-link:hover { color: var(--navy); }
 .sheet { --notch: 14px; height: auto; }
 .sheet-paper::before { width: 6px !important; }
-.sheet-skel { height: 560px; border-radius: var(--r-lg); background: linear-gradient(90deg, #EEF2F6 0%, #F7F9FB 50%, #EEF2F6 100%); background-size: 200% 100%; animation: shimmer 1.4s ease-in-out infinite; }
 
 .sheet-head { display: grid; grid-template-columns: auto 1fr auto; gap: 22px; align-items: start; padding: 24px 26px 24px 32px; background: var(--navy); color: #fff; }
 html[dir="rtl"] .sheet-head { padding: 24px 32px 24px 26px; }
@@ -1007,7 +1003,6 @@ section.tab-panel:not(.panel) { padding: 0; }
    Comments and attachments
    ========================================================================== */
 .empty > .icon { width: 28px; height: 28px; color: var(--muted); }
-.cm-skel { height: 140px; background: linear-gradient(90deg, #EEF2F6 0%, #F7F9FB 50%, #EEF2F6 100%); background-size: 200% 100%; animation: shimmer 1.4s ease-in-out infinite; }
 
 .cm-list { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 12px; }
 .cm { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; padding: 14px 16px; background: #fff; border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow-1); scroll-margin-block: 90px; }
@@ -1217,7 +1212,7 @@ html[dir="rtl"] .nt-row.unread { background: linear-gradient(270deg, rgba(40,120
 .dash-kpi {
   --accent: var(--navy);
   position: relative; display: grid; grid-template-rows: auto 1fr auto; gap: 6px;
-  padding: 14px 16px 12px; background: #fff; border: 1px solid var(--line); border-radius: var(--r-lg);
+  padding: 11px 14px 10px; background: #fff; border: 1px solid var(--line); border-radius: var(--r-lg);
   box-shadow: var(--shadow-1); color: inherit; text-decoration: none;
   transition: border-color .15s, box-shadow .15s, transform .15s var(--ease);
 }
@@ -1229,23 +1224,20 @@ html[dir="rtl"] .nt-row.unread { background: linear-gradient(270deg, rgba(40,120
 .dash-kpi-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .dash-kpi-label { font-size: 12.5px; font-weight: 600; color: var(--text-2); }
 .dash-kpi-icon { color: var(--muted); display: inline-flex; }
-.dash-kpi-value { font-size: 30px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; color: var(--accent); }
+.dash-kpi-value { font-size: 24px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; color: var(--accent); }
 /* The perforation: a dashed rule with notches, like the stub of a ticket. */
 .dash-kpi-foot {
-  position: relative; margin-top: 4px; padding-top: 10px; font-size: 12px; color: var(--muted-2);
+  position: relative; margin-top: 2px; padding-top: 8px; font-size: 11.5px; color: var(--muted-2);
   border-top: 1.5px dashed var(--perf); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .dash-kpi::before, .dash-kpi::after {
-  content: ""; position: absolute; bottom: 33px; width: 10px; height: 10px; border-radius: 50%;
+  content: ""; position: absolute; bottom: 30px; width: 10px; height: 10px; border-radius: 50%;
   background: var(--bg); border: 1px solid var(--line); z-index: 1;
 }
 .dash-kpi::before { inset-inline-start: -6px; clip-path: inset(0 0 0 50%); }
 .dash-kpi::after { inset-inline-end: -6px; clip-path: inset(0 50% 0 0); }
 html[dir="rtl"] .dash-kpi::before { clip-path: inset(0 50% 0 0); }
 html[dir="rtl"] .dash-kpi::after { clip-path: inset(0 0 0 50%); }
-.dash-skel { height: 118px; border: 0; background: linear-gradient(90deg, #EEF2F6 0%, #F7F9FB 50%, #EEF2F6 100%); background-size: 200% 100%; animation: shimmer 1.4s ease-in-out infinite; }
-.dash-skel::before, .dash-skel::after { display: none; }
-.dash-skel-panel { min-height: 160px; }
 
 .dash-error { display: flex; align-items: center; gap: 12px; padding: 14px 16px; margin-bottom: 16px; border-color: #EAB4B0; background: #FFF8F7; }
 .dash-error > .icon { color: var(--st-blocked); flex: none; }
@@ -1480,4 +1472,163 @@ a.dash-bar:hover, a.dash-bar:focus-visible { background: var(--surface-2); }
   .dep-step small { font-size: 11.5px; }
   .wf-stage.tl-item { grid-template-columns: 12px 1fr; }
   .wf-stage .tl-time { grid-column: 2; }
+}
+
+/* ==========================================================================
+   Loading feedback — one skeleton style, one spinner, one top progress bar
+   ========================================================================== */
+
+/* Skeleton: a flat tint with one soft light sweep (transform-only, so it never repaints layout). */
+.skeleton {
+  --sk-a: #EEF2F7; --sk-b: #F7F9FC;
+  position: relative; overflow: hidden; isolation: isolate;
+  height: 36px; border-radius: 8px; background: var(--sk-a);
+}
+.skeleton::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent 0%, var(--sk-b) 50%, transparent 100%);
+  transform: translateX(-100%); animation: sk-sweep 1.4s ease-in-out infinite;
+}
+html[dir="rtl"] .skeleton::after { transform: translateX(100%); animation-name: sk-sweep-rtl; }
+@keyframes sk-sweep { to { transform: translateX(100%); } }
+@keyframes sk-sweep-rtl { to { transform: translateX(-100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after { animation: none; display: none; }
+}
+.sk-line { height: 11px; border-radius: 6px; }
+.sk-title { height: 17px; border-radius: 6px; }
+.sk-h1 { height: 26px; width: 220px; max-width: 70%; border-radius: 7px; }
+.sk-sub { height: 13px; width: 340px; max-width: 90%; border-radius: 6px; margin-top: 10px; }
+.sk-pill { height: 22px; width: 84px; border-radius: 11px; }
+.sk-dot { width: 24px; height: 24px; border-radius: 50%; flex: none; }
+.sk-btn { height: 36px; width: 128px; border-radius: 9px; }
+.sk-stack { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.sk-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+
+/* Skeleton ticket card — the real silhouette, same padding and rows as TicketCardView. */
+.tk-sk .tk-head { align-items: flex-start; }
+.tk-sk .tk-body .sk-stack { gap: 6px; }
+.tk-sk .tk-copy { min-height: calc(15px * 1.35 * 2); }
+.tk-sk .tk-copy-2 { margin-top: 6px; min-height: calc(13px * 1.5 * 2); gap: 8px; }
+.tk-sk .tk-foot .sk-barcode { height: 22px; width: 64px; border-radius: 4px; flex: none; }
+.ticket-grid[aria-busy="true"] { pointer-events: none; }
+
+/* Skeleton table rows, same columns as the tickets table. */
+table.data.tickets.is-skel tbody tr { cursor: default; }
+table.data.is-skel td .skeleton { height: 14px; }
+table.data.is-skel td .skeleton.sk-pill { height: 22px; }
+
+/* Skeleton ticket sheet */
+.sheet-head-skel { background: var(--navy-wash); }
+.sheet-head-skel .sk-title { background: #E1E8F0; }
+.tabs-skel { display: flex; align-items: center; gap: 22px; height: 40px; margin: 26px 0 14px; box-shadow: inset 0 -1px 0 var(--line); overflow: hidden; }
+.tabs-skel .skeleton { height: 14px; width: 72px; border-radius: 6px; flex: none; }
+.sheet-skel-section { display: grid; gap: 18px 22px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+/* Skeleton dashboard */
+.dash-kpi-skel { height: 100px; border-radius: var(--r-lg); border: 1px solid var(--line); box-shadow: var(--shadow-1); }
+.dash-skel-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+.dash-skel-chart { height: 200px; }
+
+/* Pressed / opening feedback on tickets that navigate */
+.tk-link { -webkit-tap-highlight-color: transparent; }
+.tk-link:active .tk, .tk-link.is-opening .tk, .tk-link.is-opening:hover .tk { transform: scale(.99); }
+.tk-link.is-opening .tk, .tk-link.is-opening:hover .tk {
+  filter:
+    drop-shadow(0 0 .6px rgba(40, 120, 227, .9))
+    drop-shadow(0 0 .6px rgba(40, 120, 227, .6))
+    drop-shadow(0 4px 10px rgba(40, 120, 227, .2));
+}
+.tk-link.is-opening .tk-paper { background: #F7FAFE; }
+.tk-link.is-opening .tk-foot .go { opacity: .65; }
+table.data.tickets tbody tr { transition: background .12s; }
+table.data.tickets tbody tr:active, table.data.tickets tbody tr.is-opening { background: var(--blue-wash); }
+table.data.tickets tbody tr.is-opening .t-title { color: var(--blue-ink); }
+.dash-q-row:active { background: var(--blue-wash); }
+.dash-kpi:active { transform: scale(.99); }
+
+/* Top progress bar */
+.nav-progress { position: fixed; inset-block-start: 0; inset-inline: 0; height: 2px; z-index: 300; pointer-events: none; opacity: 0; transition: opacity .3s ease; }
+.nav-progress.on { opacity: 1; transition-duration: .05s; }
+.nav-progress i { display: block; height: 100%; width: 100%; background: var(--blue); box-shadow: 0 0 8px rgba(40, 120, 227, .55); transform-origin: 0 50%; transform: scaleX(var(--p, 0)); transition: transform .3s ease-out; }
+html[dir="rtl"] .nav-progress i { transform-origin: 100% 50%; }
+.nav-progress:not(.on) i { transition: none; }
+
+/* Spinner for buttons that are working */
+.spinner {
+  display: inline-block; flex: none; width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid currentColor; border-inline-end-color: transparent;
+  animation: spin .7s linear infinite;
+}
+.btn.sm .spinner { width: 12px; height: 12px; border-width: 1.5px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 1.6s !important; animation-iteration-count: infinite !important; }
+}
+.btn.is-busy { cursor: progress; }
+.btn.is-busy:disabled { opacity: .8; }
+
+/* ==========================================================================
+   Dashboard: filter bar and recent tickets
+   ========================================================================== */
+.dash-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 16px; }
+.dash-filters .select { height: 36px; width: auto; min-width: 150px; }
+.dash-recent { grid-column: 1 / -1; margin-top: 8px; }
+.dash-recent-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.dash-recent-head h2 { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+.dash-recent-head a { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; font-size: 13px; color: var(--blue-ink); text-decoration: none; }
+.dash-recent-head a:hover { text-decoration: underline; }
+html[dir="rtl"] .dash-recent-head a .icon { transform: scaleX(-1); }
+.dash-recent .ticket-grid { grid-template-columns: repeat(auto-fill, minmax(min(336px, 100%), 1fr)); }
+
+/* ==========================================================================
+   Create ticket: attachments and the clip count on the preview
+   ========================================================================== */
+.attach-field { display: flex; flex-direction: column; gap: 10px; }
+.attach-field .dropzone .icon { flex: none; }
+.attach-field .dropzone[aria-disabled="true"] { opacity: .6; }
+.tk-clip { margin-inline-start: auto; display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 600; color: var(--text-2); white-space: nowrap; }
+.tk-clip .icon { color: var(--muted-2); }
+.issued-note { display: flex; align-items: flex-start; gap: 8px; margin: 0 auto 16px; max-width: 380px; padding: 10px 12px; border-radius: 10px; text-align: start; font-size: 13px; color: var(--text-2); background: var(--surface-2); border: 1px solid var(--line); }
+.issued-note.warn { background: #FFF8F7; border-color: #EAB4B0; color: #8E2A25; }
+.issued-note .icon { flex: none; margin-top: 2px; }
+.issued-note a { color: var(--blue-ink); font-weight: 600; }
+
+/* ==========================================================================
+   Permissions Center: tabs, role editor, user roles
+   ========================================================================== */
+.perm-tabs { margin-bottom: 16px; }
+.role-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); gap: 16px; }
+.role-card { display: flex; flex-direction: column; gap: 10px; padding: 16px 18px; }
+.role-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.role-card h3 { font-size: 15px; font-weight: 700; color: var(--navy); letter-spacing: -0.01em; }
+.role-ar { font-family: var(--font-ar); color: var(--text-2); font-size: 14px; line-height: 1.3; }
+.role-desc { color: var(--text-2); font-size: 13px; min-height: 2.9em; }
+.role-desc.none { color: var(--muted); }
+.role-badge { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 10px; font-size: 11px; font-weight: 700; letter-spacing: .02em; background: var(--navy-wash); color: var(--navy); white-space: nowrap; }
+.role-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; padding-top: 10px; border-top: 1px dashed var(--perf); }
+.role-users { display: inline-flex; align-items: center; gap: 6px; color: var(--muted-2); font-size: 12.5px; font-weight: 600; }
+.role-actions { display: flex; gap: 2px; }
+.role-form { display: grid; gap: 14px; }
+.role-form .code-hint { color: var(--muted-2); font-size: 12px; }
+
+.ur-list { list-style: none; margin: 0; padding: 0; }
+.ur-row { display: grid; grid-template-columns: minmax(200px, 280px) minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.ur-row:last-child { border-bottom: 0; }
+.ur-row.is-dirty { background: var(--blue-wash); }
+.ur-row.is-off .ur-who strong { color: var(--muted-2); }
+.ur-who { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ur-who > div { min-width: 0; display: flex; flex-direction: column; line-height: 1.3; }
+.ur-who strong { color: var(--navy); font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ur-who small { color: var(--muted-2); font-size: 12px; }
+.ur-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.role-chip { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 11px; border-radius: 14px; border: 1px solid var(--line-2); background: #fff; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--text-2); cursor: pointer; transition: background .12s, border-color .12s, color .12s; }
+.role-chip:hover:not(:disabled) { border-color: #B7C2D0; color: var(--navy); }
+.role-chip[aria-pressed="true"] { background: var(--blue-wash); border-color: #B8D2F6; color: var(--blue-ink); }
+.role-chip:disabled { cursor: not-allowed; opacity: .6; }
+.ur-actions { display: flex; align-items: center; gap: 6px; min-height: 30px; }
+.ur-err { grid-column: 1 / -1; margin: 0; }
+@media (max-width: 860px) {
+  .ur-row { grid-template-columns: 1fr; gap: 10px; }
+  .ur-actions { justify-content: flex-start; }
 }

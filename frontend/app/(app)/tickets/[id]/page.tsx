@@ -7,6 +7,8 @@ import { api, ApiError, type ModuleView } from "@/lib/api";
 import { AttachmentsTab, CommentsTab } from "@/components/Discussion";
 import { Avatar, Icon } from "@/components/Icon";
 import { Modal } from "@/components/Modal";
+import { TicketSheetSkeleton } from "@/components/Skeletons";
+import { Spinner } from "@/components/Spinner";
 import { Perf, TicketPaper } from "@/components/TicketPaper";
 import { Barcode, EnvLabel, Person, PriorityBadge, PriorityBars, StatusBadge, TypeLabel } from "@/components/TicketBits";
 import { toast } from "@/components/Toast";
@@ -87,7 +89,7 @@ export default function TicketDetailPage() {
       </main>
     );
   }
-  if (!t) return <main className="page"><div className="sheet-skel" /></main>;
+  if (!t) return <TicketSheetSkeleton />;
 
   const ar = isArabic(t.title);
   const related = t.links.filter((l) => l.type === "RELATED");
@@ -399,8 +401,8 @@ function EditModal({ t, onClose, onSave }: { t: TicketDetail; onClose: () => voi
     <Modal open onClose={onClose} wide title={`Edit TKT-${t.id}`}
       footer={<>
         <button className="btn ghost" type="button" onClick={onClose}>Cancel</button>
-        <button className="btn primary" type="button" disabled={!changed || busy || !title.trim() || !description.trim()} onClick={async () => { setBusy(true); await onSave(body); setBusy(false); }}>
-          {busy ? "Saving…" : "Save changes"}
+        <button className={"btn primary" + (busy ? " is-busy" : "")} type="button" disabled={!changed || busy || !title.trim() || !description.trim()} onClick={async () => { setBusy(true); await onSave(body); setBusy(false); }}>
+          {busy && <Spinner />}{busy ? "Saving…" : "Save changes"}
         </button>
       </>}
     >
@@ -450,8 +452,8 @@ function AssignBody({ t, role, people, onSave, onCancel }: { t: TicketDetail; ro
       <UserPicker people={people} value={value} onChange={setValue} exclude={exclude} prefer={role === "tester" ? ["TESTER"] : ["DEVELOPER"]} placeholder="Search by name or role" />
       <div className="modal-foot" style={{ padding: "18px 0 0" }}>
         <button className="btn ghost" type="button" onClick={onCancel}>Cancel</button>
-        <button className="btn primary" type="button" disabled={busy || value === (current?.id ?? null)} onClick={async () => { setBusy(true); await onSave(value); setBusy(false); }}>
-          {busy ? "Saving…" : value == null ? "Clear" : "Save"}
+        <button className={"btn primary" + (busy ? " is-busy" : "")} type="button" disabled={busy || value === (current?.id ?? null)} onClick={async () => { setBusy(true); await onSave(value); setBusy(false); }}>
+          {busy && <Spinner />}{busy ? "Saving…" : value == null ? "Clear" : "Save"}
         </button>
       </div>
     </>
@@ -466,8 +468,8 @@ function CollabBody({ existing, people, onSave, onCancel }: { existing: number[]
       <UserPicker multi people={people.filter((p) => !existing.includes(p.id))} value={ids} onChange={setIds} placeholder="Search people" />
       <div className="modal-foot" style={{ padding: "18px 0 0" }}>
         <button className="btn ghost" type="button" onClick={onCancel}>Cancel</button>
-        <button className="btn primary" type="button" disabled={busy || ids.length === 0} onClick={async () => { setBusy(true); await onSave(ids); setBusy(false); }}>
-          {busy ? "Adding…" : ids.length > 1 ? `Add ${ids.length} people` : "Add"}
+        <button className={"btn primary" + (busy ? " is-busy" : "")} type="button" disabled={busy || ids.length === 0} onClick={async () => { setBusy(true); await onSave(ids); setBusy(false); }}>
+          {busy && <Spinner />}{busy ? "Adding…" : ids.length > 1 ? `Add ${ids.length} people` : "Add"}
         </button>
       </div>
     </>

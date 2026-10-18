@@ -5,6 +5,8 @@ import { api, ApiError, type IssuedView, type Organization, type RoleRef, type U
 import { useSession } from "@/lib/session";
 import { Avatar, Icon } from "@/components/Icon";
 import { Modal } from "@/components/Modal";
+import { RowsSkeleton } from "@/components/Skeletons";
+import { Spinner } from "@/components/Spinner";
 import { toast } from "@/components/Toast";
 
 type Draft = { id?: number; username: string; fullName: string; email: string; organization: Organization; preferredLang: "en" | "ar"; roles: string[] };
@@ -23,6 +25,7 @@ export default function UsersPage() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [issued, setIssued] = useState<{ title: string; data: IssuedView } | null>(null);
   const [confirm, setConfirm] = useState<{ kind: "reset" | "deactivate"; user: UserView } | null>(null);
 
@@ -78,6 +81,7 @@ export default function UsersPage() {
   async function runConfirm() {
     if (!confirm) return;
     const { kind, user } = confirm;
+    setConfirming(true);
     try {
       if (kind === "reset") {
         const res = await api.post<IssuedView>(`/api/users/${user.id}/reset-password`);
@@ -91,6 +95,8 @@ export default function UsersPage() {
     } catch (e) {
       setConfirm(null);
       toast(e instanceof ApiError ? e.message : "That didn't work.", "error");
+    } finally {
+      setConfirming(false);
     }
   }
 
@@ -151,7 +157,7 @@ export default function UsersPage() {
           <button className="btn" type="button" onClick={load}>Try again</button>
         </div>
       ) : !users ? (
-        <div className="table-wrap"><div className="skeleton-rows">{Array.from({ length: 5 }, (_, i) => <div key={i} className="skeleton" />)}</div></div>
+        <RowsSkeleton rows={6} />
       ) : shown.length === 0 ? (
         <div className="empty panel">
           <h3>No users match</h3>
@@ -212,8 +218,8 @@ export default function UsersPage() {
         description={draft?.id == null ? "They'll get a temporary password and choose their own at first sign-in." : undefined}
         footer={<>
           <button className="btn ghost" type="button" onClick={() => setDraft(null)}>Cancel</button>
-          <button className="btn primary" type="button" onClick={save} disabled={saving || !draft?.fullName.trim() || !draft?.username.trim() || !draft?.roles.length}>
-            {saving ? "Saving…" : draft?.id == null ? "Create user" : "Save changes"}
+          <button className={"btn primary" + (saving ? " is-busy" : "")} type="button" onClick={save} disabled={saving || !draft?.fullName.trim() || !draft?.username.trim() || !draft?.roles.length}>
+            {saving && <Spinner />}{saving ? "Saving…" : draft?.id == null ? "Create user" : "Save changes"}
           </button>
         </>}
       >
@@ -310,9 +316,9 @@ export default function UsersPage() {
           ? "Their current password stops working and they're signed out everywhere. You'll get a temporary password to pass on."
           : "They're signed out immediately and can't sign in. Their tickets, comments and history stay. You can reactivate them later."}
         footer={<>
-          <button className="btn ghost" type="button" onClick={() => setConfirm(null)}>Cancel</button>
-          <button className={"btn " + (confirm?.kind === "deactivate" ? "danger" : "navy")} type="button" onClick={runConfirm}>
-            {confirm?.kind === "reset" ? "Reset password" : "Deactivate user"}
+          <button className="btn ghost" type="button" disabled={confirming} onClick={() => setConfirm(null)}>Cancel</button>
+          <button className={"btn " + (confirm?.kind === "deactivate" ? "danger" : "navy") + (confirming ? " is-busy" : "")} type="button" disabled={confirming} onClick={runConfirm}>
+            {confirming && <Spinner />}{confirm?.kind === "reset" ? "Reset password" : "Deactivate user"}
           </button>
         </>}
       />

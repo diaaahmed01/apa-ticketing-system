@@ -1,10 +1,14 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Fragment, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { api, ApiError, type PermChange, type PermChangeResult, type PermMatrix } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/Icon";
 import { Modal } from "@/components/Modal";
+import { RolesTab, UserRolesTab } from "@/components/RoleAdmin";
+import { AdminPageSkeleton, RowsSkeleton } from "@/components/Skeletons";
+import { Spinner } from "@/components/Spinner";
 import { toast } from "@/components/Toast";
 
 const ALWAYS = "ALWAYS";
@@ -32,8 +36,25 @@ function categoryName(c: string) {
 
 type Pop = { role: string; perm: string; rect: DOMRect };
 
+type PermTab = "matrix" | "roles" | "users";
+
 export default function PermissionsPage() {
-  const { can, loading } = useSession();
+  return <Suspense fallback={<AdminPageSkeleton rows={8} action={false} />}><Permissions /></Suspense>;
+}
+
+function Permissions() {
+  const router = useRouter();
+  const params = useSearchParams();
+  const { me, can, loading } = useSession();
+  const canUsers = can("USER_VIEW");
+  const tabParam = params.get("tab");
+  const tab: PermTab = tabParam === "roles" ? "roles" : tabParam === "users" && canUsers ? "users" : "matrix";
+  const setTab = (t: PermTab) => {
+    const sp = new URLSearchParams(params.toString());
+    if (t === "matrix") sp.delete("tab"); else sp.set("tab", t);
+    const qs = sp.toString();
+    router.replace(qs ? "?" + qs : "/admin/permissions", { scroll: false });
+  };
   const [matrix, setMatrix] = useState<PermMatrix | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [staged, setStaged] = useState<Record<string, string[]>>({});
@@ -62,6 +83,18 @@ export default function PermissionsPage() {
     }
     for (const [k, v] of m) m.set(k, norm(v));
     return m;
+  }, [matrix]);
+
+  useEffect(() => {
+    if (!matrix) return;
+    const codes = new Set(matrix.roles.map((r) => r.code));
+    setStaged((s) => {
+      const gone = Object.keys(s).filter((k) => !codes.has(k.split("|")[0]));
+      if (gone.length === 0) return s;
+      const copy = { ...s };
+      gone.forEach((k) => delete copy[k]);
+      return copy;
+    });
   }, [matrix]);
 
   const orig = useCallback((role: string, perm: string) => original.get(key(role, perm)) ?? [], [original]);
@@ -166,18 +199,32 @@ export default function PermissionsPage() {
           <h1>Roles &amp; Permissions</h1>
           <p className="sub">Choose what each role can do. Conditional grants apply only when the person has that relationship to the ticket.</p>
         </div>
-        <div className="head-actions">
-          <label className="local-search">
-            <Icon name="search" size="sm" />
-            <input type="search" placeholder="Search permissions" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search permissions" />
-          </label>
+        {tab === "matrix" && (
+          <div className="head-actions">
+            <label className="local-search">
+              <Icon name="search" size="sm" />
+              <input type="search" placeholder="Search permissions" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search permissions" />
+            </label>
+          </div>
+        )}
+      </div>
+
+      <div className="perm-tabs">
+        <div className="seg" role="group" aria-label="Permissions Center sections">
+          <button type="button" aria-pressed={tab === "matrix"} onClick={() => setTab("matrix")}>Permission matrix</button>
+          <button type="button" aria-pressed={tab === "roles"} onClick={() => setTab("roles")}>Roles</button>
+          {canUsers && <button type="button" aria-pressed={tab === "users"} onClick={() => setTab("users")}>User roles</button>}
         </div>
       </div>
 
       {loadError ? (
         <div className="empty panel"><h3>Permissions didn&apos;t load</h3><p>{loadError}</p><button className="btn" type="button" onClick={load}>Try again</button></div>
       ) : !matrix ? (
-        <div className="panel"><div className="skeleton-rows">{Array.from({ length: 8 }, (_, i) => <div key={i} className="skeleton" />)}</div></div>
+        <RowsSkeleton rows={8} />
+      ) : tab === "roles" ? (
+        <RolesTab roles={matrix.roles} onChanged={load} />
+      ) : tab === "users" ? (
+        <UserRolesTab roles={matrix.roles} canAssign={can("USER_ASSIGN_ROLES")} meId={me?.id} onChanged={load} />
       ) : (
         <>
           <ul className="perm-legend" aria-label="Legend">
@@ -266,7 +313,7 @@ export default function PermissionsPage() {
         <div className="perm-bar" role="region" aria-label="Unsaved changes">
           <span className="perm-bar-count"><span className="perm-dot" aria-hidden="true" /><b className="num">{dirtyCount}</b> unsaved {dirtyCount === 1 ? "change" : "changes"}</span>
           <div className="perm-bar-actions">
-            <button className="btn ghost" type="button" onClick={() => { setStaged({}); setPop(null); }}>Discard</button>
+            <button className="btn ghost" type="button" onClick={() => { setStaged({}); setPop(null); }}>Reset changes</button>
             <button className="btn primary" type="button" onClick={() => { setSaveError(null); setReviewing(true); }}>Review &amp; save</button>
           </div>
         </div>
@@ -280,7 +327,7 @@ export default function PermissionsPage() {
         wide
         footer={<>
           <button className="btn ghost" type="button" onClick={() => setReviewing(false)} disabled={saving}>Back</button>
-          <button className="btn primary" type="button" onClick={confirmSave} disabled={saving}>{saving ? "Saving…" : "Save changes"}</button>
+          <button className={"btn primary" + (saving ? " is-busy" : "")} type="button" onClick={confirmSave} disabled={saving}>{saving && <Spinner />}{saving ? "Saving…" : "Save changes"}</button>
         </>}
       >
         <div className="perm-review">

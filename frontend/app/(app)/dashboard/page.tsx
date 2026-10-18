@@ -2,18 +2,20 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { api, ApiError, type ModuleView } from "@/lib/api";
 import { PERIODS, type DashboardData, type Rate } from "@/lib/dashboard";
 import { useSession } from "@/lib/session";
 import {
   ENV_LABEL, PRIORITIES, PRIORITY_LABEL, STATUS_CLASS, STATUS_LABEL, TYPE_LABEL, WORKFLOW, fmtDate, isArabic, relTime,
-  type Environment, type Status, type TicketType,
+  type Environment, type Priority, type Status, type TicketType,
 } from "@/lib/tickets";
 import { Avatar, Icon, type IconName } from "@/components/Icon";
-import { StatusBadge } from "@/components/TicketBits";
+import { DashboardSkeleton, PageHeadSkeleton } from "@/components/Skeletons";
+import { StatusBadge, TicketCardView } from "@/components/TicketBits";
 
 const OPEN_STATUSES: Status[] = [...WORKFLOW.filter((s) => s !== "CLOSED"), "BLOCKED"];
+const ENVIRONMENTS = Object.keys(ENV_LABEL) as Environment[];
 const PIPELINE: Status[] = WORKFLOW.filter((s) => s !== "CLOSED");
 
 const nf = new Intl.NumberFormat("en-GB");
@@ -34,6 +36,10 @@ function Dashboard() {
   const days = PERIODS.some((p) => p.days === Number(params.get("days"))) ? Number(params.get("days")) : 90;
   const moduleParam = params.get("module");
   const moduleId = moduleParam && /^\d+$/.test(moduleParam) ? Number(moduleParam) : null;
+  const envParam = params.get("environment");
+  const env = ENVIRONMENTS.find((e) => e === envParam) ?? null;
+  const prioParam = params.get("priority");
+  const prio = PRIORITIES.find((p) => p === prioParam) ?? null;
 
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -54,11 +60,13 @@ function Dashboard() {
     setError(null);
     const qs = new URLSearchParams({ days: String(days) });
     if (moduleId !== null) qs.set("module", String(moduleId));
+    if (env) qs.set("environment", env);
+    if (prio) qs.set("priority", prio);
     api.get<DashboardData>("/api/dashboard?" + qs.toString())
       .then((d) => { if (run.current === mine) setData(d); })
       .catch((e) => { if (run.current === mine) setError(e instanceof ApiError ? e.message : "Couldn't load the dashboard."); })
       .finally(() => { if (run.current === mine) setBusy(false); });
-  }, [allowed, days, moduleId, tick]);
+  }, [allowed, days, moduleId, env, prio, tick]);
 
   function setParam(key: string, value: string | null) {
     const sp = new URLSearchParams(params.toString());
@@ -67,7 +75,7 @@ function Dashboard() {
     router.replace(qs ? "?" + qs : "/dashboard", { scroll: false });
   }
 
-  if (sessionLoading || !me) return <main className="page"><DashSkeleton /></main>;
+  if (sessionLoading || !me) return <main className="page dash"><PageHeadSkeleton /><DashboardSkeleton /></main>;
 
   if (!allowed) {
     return (
@@ -85,8 +93,13 @@ function Dashboard() {
   const period = PERIODS.find((p) => p.days === days) ?? PERIODS[1];
 
   // Drill-down links reuse the All Tickets URL filters.
-  const mod = moduleId !== null ? ["module=" + moduleId] : [];
-  const link = (...q: string[]) => "/tickets?" + [...q, ...mod].join("&");
+  const filters = [
+    ...(moduleId !== null ? ["module=" + moduleId] : []),
+    ...(env ? ["environment=" + env] : []),
+    ...(prio ? ["priority=" + prio] : []),
+  ];
+  const link = (...q: string[]) => "/tickets?" + [...q, ...filters].join("&");
+  const filtered = filters.length > 0;
   const openQ = OPEN_STATUSES.map((s) => "status=" + s);
   const since = data ? new Date(data.from).toLocaleDateString("en-CA") : "";
 
@@ -100,19 +113,36 @@ function Dashboard() {
             {data && <> · updated {relTime(data.generatedAt)}</>}
           </p>
         </div>
-        <div className="head-actions">
-          <div className="seg" role="group" aria-label="Period">
-            {PERIODS.map((p) => (
-              <button key={p.days} type="button" aria-pressed={days === p.days} title={"Last " + p.long}
-                onClick={() => setParam("days", p.days === 90 ? null : String(p.days))}>{p.label}</button>
-            ))}
-          </div>
-          <select className="select dash-module" aria-label="Module" value={moduleId ?? ""}
-            onChange={(e) => setParam("module", e.target.value || null)}>
-            <option value="">All modules</option>
-            {modules.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-          </select>
+      </div>
+
+      <div className="dash-filters" role="group" aria-label="Dashboard filters">
+        <div className="seg" role="group" aria-label="Period">
+          {PERIODS.map((p) => (
+            <button key={p.days} type="button" aria-pressed={days === p.days} title={"Last " + p.long}
+              onClick={() => setParam("days", p.days === 90 ? null : String(p.days))}>{p.label}</button>
+          ))}
         </div>
+        <select className="select dash-module" aria-label="Module" value={moduleId ?? ""}
+          onChange={(e) => setParam("module", e.target.value || null)}>
+          <option value="">All modules</option>
+          {modules.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+        </select>
+        <select className="select dash-module" aria-label="Environment" value={env ?? ""}
+          onChange={(e) => setParam("environment", e.target.value || null)}>
+          <option value="">All environments</option>
+          {ENVIRONMENTS.map((e) => <option key={e} value={e}>{ENV_LABEL[e]}</option>)}
+        </select>
+        <select className="select dash-module" aria-label="Priority" value={prio ?? ""}
+          onChange={(e) => setParam("priority", e.target.value || null)}>
+          <option value="">All priorities</option>
+          {PRIORITIES.map((p) => <option key={p} value={p}>{PRIORITY_LABEL[p]}</option>)}
+        </select>
+        {filtered && (
+          <button className="clear-link" type="button"
+            onClick={() => { const sp = new URLSearchParams(params.toString()); ["module", "environment", "priority"].forEach((k) => sp.delete(k)); const qs = sp.toString(); router.replace(qs ? "?" + qs : "/dashboard", { scroll: false }); }}>
+            Clear filters
+          </button>
+        )}
       </div>
 
       {error && (
@@ -123,24 +153,20 @@ function Dashboard() {
         </div>
       )}
 
-      {!data && !error && <DashSkeleton />}
+      {!data && !error && <DashboardSkeleton />}
 
       {data && (
         <div className={"dash-grid" + (busy ? " is-busy" : "")} aria-busy={busy}>
           <section className="dash-kpis" aria-label="Key figures">
-            <Kpi icon="ticket" label="Open tickets" value={data.totals.open} foot="Not yet closed" href={link(...openQ)} />
-            <Kpi icon="alert" label="Critical open" value={data.totals.criticalOpen} tone={data.totals.criticalOpen > 0 ? "danger" : undefined}
-              foot={data.totals.open ? pct(data.totals.criticalOpen / data.totals.open) + " of open" : "Nothing open"}
-              href={link("priority=CRITICAL", ...openQ)} />
-            <Kpi icon="blocked" label="Blocked" value={data.totals.blocked} tone={data.totals.blocked > 0 ? "danger" : undefined}
-              foot="Waiting on something" href={link("status=BLOCKED")} />
-            <Kpi icon="user" label="Unassigned" value={data.totals.unassignedOpen} tone={data.totals.unassignedOpen > 0 ? "warn" : undefined}
-              foot="No owner yet" href={link("assignee=0", ...openQ)} />
-            <Kpi icon="plus" label="Created" value={data.totals.createdInPeriod} foot={"Last " + period.long}
+            <Kpi icon="ticket" label="Total tickets" value={data.kpis.total} foot={"Created in last " + period.long}
               href={link("createdFrom=" + since)} />
-            <Kpi icon="checkCircle" label="Resolved" value={data.totals.closedInPeriod.resolved} tone="good"
-              foot={`${num(data.totals.closedInPeriod.unresolved)} unresolved · ${num(data.totals.closedInPeriod.cancelled)} cancelled`}
-              href={link("status=CLOSED", "closure=RESOLVED", "closedFrom=" + since)} />
+            <Kpi icon="inbox" label="Open" value={data.kpis.open} foot="Not started yet" href={link("status=OPEN")} />
+            <Kpi icon="clock" label="In progress" value={data.kpis.inProgress} foot="Being worked on" href={link("status=IN_PROGRESS")} />
+            <Kpi icon="checks" label="Testing" value={data.kpis.testing} foot="Being verified" href={link("status=TESTING")} />
+            <Kpi icon="blocked" label="Blocked" value={data.kpis.blocked} tone={data.kpis.blocked > 0 ? "danger" : undefined}
+              foot="Waiting on something" href={link("status=BLOCKED")} />
+            <Kpi icon="checkCircle" label="Closed" value={data.kpis.closed} tone="good" foot={"Closed in last " + period.long}
+              href={link("status=CLOSED", "closedFrom=" + since)} />
           </section>
 
           <section className="panel dash-queue">
@@ -265,6 +291,24 @@ function Dashboard() {
                 </div>
               </div>
             </div>
+          </section>
+
+          <section className="dash-recent" aria-labelledby="dash-recent-h">
+            <div className="dash-recent-head">
+              <h2 id="dash-recent-h">Recent tickets</h2>
+              <Link href={link()}>View all tickets <Icon name="arrowRight" size="xs" /></Link>
+            </div>
+            {data.recent.length === 0 ? (
+              <div className="panel"><div className="dash-empty">
+                <Icon name="ticket" />
+                <strong>No tickets match these filters</strong>
+                <span>{filtered ? "Clear a filter to see more." : "New tickets will appear here."}</span>
+              </div></div>
+            ) : (
+              <div className="ticket-grid">
+                {data.recent.map((t) => <TicketCardView key={t.id} t={t} />)}
+              </div>
+            )}
           </section>
         </div>
       )}
@@ -451,19 +495,6 @@ function TrendChart({ trend, periodLabel }: { trend: DashboardData["trend"]; per
         <thead><tr><th>Week of</th><th>Created</th><th>Closed</th></tr></thead>
         <tbody>{trend.map((w) => <tr key={w.weekStart}><td>{fmtDate(w.weekStart)}</td><td>{w.created}</td><td>{w.closed}</td></tr>)}</tbody>
       </table>
-    </div>
-  );
-}
-
-function DashSkeleton() {
-  const cards = useMemo(() => Array.from({ length: 6 }), []);
-  return (
-    <div className="dash-grid" aria-busy="true" aria-label="Loading dashboard">
-      <div className="dash-kpis">{cards.map((_, i) => <div key={i} className="dash-kpi dash-skel" />)}</div>
-      <div className="panel dash-queue dash-skel-panel"><div className="skeleton-rows"><div className="skeleton" /><div className="skeleton" /><div className="skeleton" /><div className="skeleton" /></div></div>
-      <div className="panel dash-trend dash-skel-panel"><div className="skeleton-rows"><div className="skeleton" style={{ height: 220 }} /></div></div>
-      <div className="panel dash-pipeline dash-skel-panel"><div className="skeleton-rows"><div className="skeleton" /><div className="skeleton" /></div></div>
-      {[0, 1, 2].map((i) => <div key={i} className="panel dash-third dash-skel-panel"><div className="skeleton-rows"><div className="skeleton" /><div className="skeleton" /><div className="skeleton" /></div></div>)}
     </div>
   );
 }

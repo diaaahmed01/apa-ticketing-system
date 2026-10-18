@@ -6,6 +6,9 @@ import { api, ApiError } from "@/lib/api";
 import { groupByDay, typeMeta, useNotifications, type NotificationItem, type NotificationPage } from "@/lib/notifications";
 import { relTime, ticketNo } from "@/lib/tickets";
 import { Avatar, Icon } from "@/components/Icon";
+import { startProgress } from "@/components/NavProgress";
+import { RowsSkeleton } from "@/components/Skeletons";
+import { Spinner } from "@/components/Spinner";
 import { toast } from "@/components/Toast";
 
 const PAGE = 20;
@@ -71,7 +74,7 @@ export default function NotificationsPage() {
       setUnread(Math.max(0, unread - 1));
       api.post<{ unread: number }>(`/api/notifications/${n.id}/read`).then((r) => setUnread(r.unread)).catch(() => refresh());
     }
-    if (n.ticketId != null) router.push(`/tickets/${n.ticketId}`);
+    if (n.ticketId != null) { startProgress(); router.push(`/tickets/${n.ticketId}`); }
   }
 
   async function readAll() {
@@ -107,8 +110,8 @@ export default function NotificationsPage() {
               Unread{unread > 0 && <span className="nt-seg-n">{unread > 99 ? "99+" : unread}</span>}
             </button>
           </div>
-          <button className="btn" type="button" onClick={readAll} disabled={busy || unread === 0}>
-            <Icon name="checks" size="sm" />Mark all as read
+          <button className={"btn" + (busy ? " is-busy" : "")} type="button" onClick={readAll} disabled={busy || unread === 0}>
+            {busy ? <Spinner /> : <Icon name="checks" size="sm" />}Mark all as read
           </button>
         </div>
       </div>
@@ -116,7 +119,7 @@ export default function NotificationsPage() {
       {loadError ? (
         <div className="empty panel"><h3>Notifications didn&apos;t load</h3><p>{loadError}</p><button className="btn" type="button" onClick={() => load(filter)}>Try again</button></div>
       ) : !items ? (
-        <div className="panel"><div className="skeleton-rows">{Array.from({ length: 6 }, (_, i) => <div key={i} className="skeleton" />)}</div></div>
+        <RowsSkeleton rows={7} />
       ) : items.length === 0 ? (
         <div className="empty panel">
           <Icon name={filter === "unread" ? "checkCircle" : "inbox"} />
@@ -164,7 +167,7 @@ export default function NotificationsPage() {
           ))}
           {items.length < total && (
             <div className="nt-more">
-              <button className="btn" type="button" onClick={loadMore} disabled={more}>{more ? "Loading…" : "Load more"}</button>
+              <button className={"btn" + (more ? " is-busy" : "")} type="button" onClick={loadMore} disabled={more}>{more && <Spinner />}{more ? "Loading…" : "Load more"}</button>
               <span className="muted">Showing {items.length} of {total}</span>
             </div>
           )}

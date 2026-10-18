@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, type ModuleView } from "@/lib/api";
 import { Icon } from "@/components/Icon";
 import { Modal } from "@/components/Modal";
+import { RowsSkeleton } from "@/components/Skeletons";
+import { Spinner } from "@/components/Spinner";
 import { toast } from "@/components/Toast";
 
 type Draft = { id?: number; name: string; nameAr: string };
@@ -80,7 +82,7 @@ export default function ModulesPage() {
       {loadError ? (
         <div className="empty panel"><h3>Modules didn&apos;t load</h3><p>{loadError}</p><button className="btn" type="button" onClick={load}>Try again</button></div>
       ) : !modules ? (
-        <div className="panel"><div className="skeleton-rows">{Array.from({ length: 6 }, (_, i) => <div key={i} className="skeleton" />)}</div></div>
+        <RowsSkeleton rows={6} />
       ) : modules.length === 0 ? (
         <div className="empty panel">
           <h3>No modules yet</h3>
@@ -118,8 +120,8 @@ export default function ModulesPage() {
         title={draft?.id == null ? "Add module" : "Edit module"}
         footer={<>
           <button className="btn ghost" type="button" onClick={() => setDraft(null)}>Cancel</button>
-          <button className="btn primary" type="button" onClick={save} disabled={saving || !draft?.name.trim()}>
-            {saving ? "Saving…" : draft?.id == null ? "Add module" : "Save changes"}
+          <button className={"btn primary" + (saving ? " is-busy" : "")} type="button" onClick={save} disabled={saving || !draft?.name.trim()}>
+            {saving && <Spinner />}{saving ? "Saving…" : draft?.id == null ? "Add module" : "Save changes"}
           </button>
         </>}
       >
