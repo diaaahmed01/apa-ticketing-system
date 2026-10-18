@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { useNotifications } from "@/lib/notifications";
 import { useSession } from "@/lib/session";
@@ -37,20 +37,84 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [drawer, setDrawer] = useState(false);
+  const [hover, setHover] = useState(false);
+  const [narrow, setNarrow] = useState(false);
+  const navRef = useRef<HTMLElement>(null);
+  const pillRef = useRef<HTMLSpanElement>(null);
+  const enterTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const leaveTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const placed = useRef<{ path: string | null }>({ path: null });
 
   useEffect(() => { setCollapsed(readPref("ats-collapsed") === "1"); }, []);
   useEffect(() => { setDrawer(false); }, [pathname]);
 
+  // Under 1080px the sidebar is a drawer; hover-expand doesn't apply there.
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1080px)");
+    const on = () => { setNarrow(mq.matches); if (mq.matches) setHover(false); };
+    on();
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  useEffect(() => () => { clearTimeout(enterTimer.current); clearTimeout(leaveTimer.current); }, []);
+
+  const peek = collapsed && hover && !narrow;
+
+  function peekIn(delay: number) {
+    clearTimeout(leaveTimer.current);
+    if (narrow || !collapsed || hover) return;
+    clearTimeout(enterTimer.current);
+    enterTimer.current = setTimeout(() => setHover(true), delay);
+  }
+  function peekOut() {
+    clearTimeout(enterTimer.current);
+    clearTimeout(leaveTimer.current);
+    leaveTimer.current = setTimeout(() => setHover(false), 200);
+  }
+
+  // Slide the pill to the active link. Measured from the link's offsetTop/offsetHeight inside .nav (position: relative),
+  // so it is right in both widths and when the list scrolls. Only a route change animates; everything else snaps.
+  const placePill = useCallback((animate: boolean) => {
+    const pill = pillRef.current;
+    const nav = navRef.current;
+    if (!pill || !nav) return;
+    const a = nav.querySelector<HTMLElement>("a.active");
+    pill.style.transition = animate ? "" : "none";
+    if (!a) { pill.style.opacity = "0"; return; }
+    pill.style.height = a.offsetHeight + "px";
+    pill.style.transform = `translateY(${a.offsetTop}px)`;
+    pill.style.opacity = "1";
+  }, []);
+
+  useLayoutEffect(() => {
+    const animate = placed.current.path !== null && placed.current.path !== pathname;
+    placed.current.path = pathname;
+    placePill(animate);
+  }, [pathname, me, placePill]);
+
+  // Collapse, pin, hover and resize change item positions (the admin label's height eases); follow them without animating.
+  useLayoutEffect(() => {
+    placePill(false);
+    let frame = 0;
+    const start = performance.now();
+    const tick = () => { placePill(false); if (performance.now() - start < 340) frame = requestAnimationFrame(tick); };
+    frame = requestAnimationFrame(tick);
+    const onResize = () => placePill(false);
+    window.addEventListener("resize", onResize);
+    return () => { cancelAnimationFrame(frame); window.removeEventListener("resize", onResize); };
+  }, [collapsed, peek, drawer, narrow, placePill]);
+
   const admin = ADMIN.filter((n) => !n.permission || can(n.permission));
   const main = MAIN.filter((n) => !n.permission || can(n.permission));
 
-  const navLink = (n: NavItem) => {
+  const navLink = (n: NavItem, i: number) => {
+    const stagger = { ["--i" as string]: i } as React.CSSProperties;
     const active = n.href === "/tickets"
       ? pathname === "/tickets" || (/^\/tickets\/\d+/.test(pathname))
       : pathname.startsWith(n.href);
     if (n.soon) {
       return (
-        <span key={n.href} className="nav-soon" title={`${n.label} — coming in a later build phase`} aria-disabled="true">
+        <span key={n.href} className="nav-soon" style={stagger} title={`${n.label} — coming in a later build phase`} aria-disabled="true">
           <Icon name={n.icon} />
           <span>{n.label}</span>
           <em className="soon-tag">Soon</em>
@@ -58,7 +122,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       );
     }
     return (
-      <Link key={n.href} href={n.href} className={active ? "active" : undefined} aria-current={active ? "page" : undefined} title={n.label}>
+      <Link key={n.href} href={n.href} style={stagger} className={active ? "active" : undefined} aria-current={active ? "page" : undefined} title={n.label}>
         <Icon name={n.icon} />
         <span>{n.label}</span>
         {n.href === "/notifications" && unread > 0 && <span className="count hot">{unread > 99 ? "99+" : unread}</span>}
@@ -67,8 +131,14 @@ export function Shell({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className={["app", collapsed ? "collapsed" : "", drawer ? "drawer-open" : ""].filter(Boolean).join(" ")}>
-      <aside className="sidebar">
+    <div className={["app", collapsed ? "collapsed" : "", peek ? "peek" : "", drawer ? "drawer-open" : ""].filter(Boolean).join(" ")}>
+      <aside
+        className="sidebar"
+        onMouseEnter={() => peekIn(150)}
+        onMouseLeave={peekOut}
+        onFocus={(e) => { if (e.target.matches(":focus-visible")) { clearTimeout(leaveTimer.current); if (collapsed && !narrow) setHover(true); } }}
+        onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) peekOut(); }}
+      >
         <div className="sidebar-head">
         <Link className="brand" href="/tickets">
           <span className="brand-mark">
@@ -90,10 +160,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <Icon name="collapse" />
           </button>
         </div>
-        <nav className="nav" aria-label="Main">
-          {main.map(navLink)}
-          {admin.length > 0 && <div className="nav-label">Administration</div>}
-          {admin.map(navLink)}
+        <nav className="nav" aria-label="Main" ref={navRef}>
+          <span className="nav-pill" ref={pillRef} aria-hidden="true" />
+          {main.map((n, i) => navLink(n, i))}
+          {admin.length > 0 && <div className="nav-label" style={{ ["--i" as string]: main.length } as React.CSSProperties}>Administration</div>}
+          {admin.map((n, i) => navLink(n, main.length + 1 + i))}
         </nav>
       </aside>
       <div className="scrim" onClick={() => setDrawer(false)} />

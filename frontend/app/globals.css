@@ -108,17 +108,34 @@ button { font: inherit; color: inherit; }
   padding: 14px 12px;
   overflow: hidden;
   z-index: 40;
+  width: var(--sidebar-w);
+  transition: width .24s var(--ease), box-shadow .24s var(--ease);
 }
+.app.collapsed .sidebar { width: var(--sidebar-w-collapsed); }
+/* Hover/focus peek: the rail widens over the page; the grid column stays at the collapsed width. */
+.app.collapsed.peek .sidebar { width: var(--sidebar-w); box-shadow: var(--shadow-pop); }
 .sidebar-head { display: flex; align-items: center; gap: 6px; padding-bottom: 16px; }
 .brand { display: flex; align-items: center; gap: 10px; padding: 4px 6px; min-height: 40px; min-width: 0; flex: 1; text-decoration: none; overflow: hidden; }
 .brand-mark { width: 32px; height: 32px; flex: none; border-radius: 8px; background: var(--blue); display: grid; place-items: center; color: #fff; }
 .brand-mark svg { width: 18px; height: 18px; }
-.brand-text { line-height: 1.2; white-space: nowrap; transition: opacity .15s; }
+.brand-text { line-height: 1.2; white-space: nowrap; }
 .brand-text strong { display: block; color: #fff; font-size: 14px; font-weight: 650; letter-spacing: -0.01em; }
 .brand-text span { font-size: 12px; color: #8FA1B7; }
-.app.collapsed .brand-text { opacity: 0; pointer-events: none; }
-.nav { display: flex; flex-direction: column; gap: 2px; flex: 1; overflow-y: auto; overflow-x: hidden; }
-.nav-label { font-size: 11px; font-weight: 600; color: #7489A2; padding: 14px 13px 6px; white-space: nowrap; letter-spacing: .02em; }
+.nav { display: flex; flex-direction: column; gap: 2px; flex: 1; overflow-y: auto; overflow-x: hidden; position: relative; }
+.nav-label { font-size: 11px; font-weight: 600; line-height: 16px; height: 36px; overflow: hidden; color: #7489A2; padding: 14px 13px 6px; white-space: nowrap; letter-spacing: .02em; }
+/* Sliding active indicator: measured and positioned by Shell. */
+.nav-pill { position: absolute; top: 0; inset-inline: 0; height: 0; border-radius: 8px; background: rgba(40,120,227,.22); pointer-events: none; opacity: 0; transition: transform .38s cubic-bezier(.34,1.4,.5,1), height .38s cubic-bezier(.34,1.4,.5,1), opacity .2s; will-change: transform; }
+/* Labels fade and slide in with a small stagger (--i set per item); they leave quickly. */
+.brand-text, .nav a > span, .nav-soon > span, .soon-tag, .nav-label {
+  transition: opacity .18s ease, transform .18s var(--ease), height .24s var(--ease), padding .24s var(--ease);
+  transition-delay: calc(var(--i, 0) * 20ms);
+}
+.app.collapsed:not(.peek) .brand-text, .app.collapsed:not(.peek) .nav a > span, .app.collapsed:not(.peek) .nav-soon > span,
+.app.collapsed:not(.peek) .soon-tag, .app.collapsed:not(.peek) .nav-label {
+  opacity: 0; transform: translateX(6px); pointer-events: none; transition-duration: .1s; transition-delay: 0s;
+}
+html[dir="rtl"] .app.collapsed:not(.peek) .brand-text, html[dir="rtl"] .app.collapsed:not(.peek) .nav a > span, html[dir="rtl"] .app.collapsed:not(.peek) .nav-soon > span,
+html[dir="rtl"] .app.collapsed:not(.peek) .soon-tag, html[dir="rtl"] .app.collapsed:not(.peek) .nav-label { transform: translateX(-6px); }
 .nav a {
   display: flex; align-items: center; gap: 11px;
   padding: 8px 13px; border-radius: 8px;
@@ -127,7 +144,7 @@ button { font: inherit; color: inherit; }
   transition: background .15s, color .15s;
 }
 .nav a:hover { background: rgba(255,255,255,.06); color: #fff; }
-.nav a.active { background: rgba(40,120,227,.22); color: #fff; }
+.nav a.active { color: #fff; }
 .nav a.active .icon { color: #8CC0FF; }
 .nav a .count { margin-inline-start: auto; font-size: 11.5px; font-weight: 600; background: rgba(255,255,255,.1); color: #E4ECF5; padding: 1px 7px; border-radius: 10px; font-variant-numeric: tabular-nums; }
 .nav a .count.hot { background: var(--blue); color: #fff; }
@@ -138,8 +155,11 @@ button { font: inherit; color: inherit; }
 /* Collapsed: the toggle sits under the brand mark, both centred on the 68px rail (icon centre = 34px). */
 .app.collapsed .sidebar-head { flex-direction: column; gap: 8px; }
 .app.collapsed .brand { flex: none; width: 44px; }
-.app.collapsed .nav a span, .app.collapsed .nav a .count, .app.collapsed .nav-label { opacity: 0; pointer-events: none; }
-.app.collapsed .nav-label { height: 10px; padding: 0; }
+.app.collapsed:not(.peek) .nav-label { height: 10px; padding: 0; }
+/* Peek keeps the head's collapsed height so nothing below it shifts; the toggle stays centred on the rail. */
+.app.collapsed.peek .sidebar-head { flex-direction: column; align-items: stretch; gap: 8px; }
+.app.collapsed.peek .brand { flex: none; }
+.app.collapsed.peek .collapse-btn { align-self: flex-start; margin-inline-start: 7px; }
 .app.collapsed .collapse-btn .icon { transform: scaleX(-1); }
 html[dir="rtl"] .collapse-btn .icon { transform: scaleX(-1); }
 html[dir="rtl"] .app.collapsed .collapse-btn .icon { transform: none; }
@@ -467,7 +487,8 @@ dialog.modal[open] { animation: pop .26s var(--ease); }
 .modal-head h2 { font-size: 18px; letter-spacing: -0.015em; }
 .modal-head p { color: var(--text-2); margin-top: 6px; }
 .modal-body { padding: 14px 22px; }
-.modal-foot { padding: 14px 22px 20px; display: flex; justify-content: flex-end; gap: 8px; }
+.modal-foot { padding: 14px 22px 20px; display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
+.foot-why { margin-inline-end: auto; font-size: 12.5px; color: var(--muted-2, #6B7C93); }
 
 /* ==========================================================================
    Responsive shell
@@ -478,8 +499,12 @@ dialog.modal[open] { animation: pop .26s var(--ease); }
   .sidebar { position: fixed; inset-block: 0; inset-inline-start: 0; width: 272px; transform: translateX(-100%); transition: transform .26s var(--ease); box-shadow: var(--shadow-pop); }
   html[dir="rtl"] .sidebar { transform: translateX(100%); }
   .app.drawer-open .sidebar { transform: none; }
-  .app.collapsed .nav a span, .app.collapsed .nav a .count, .app.collapsed .nav-label { opacity: 1; pointer-events: auto; }
-  .app.collapsed .brand-text { opacity: 1; pointer-events: auto; }
+  .app.collapsed .sidebar, .app.collapsed.peek .sidebar { width: 272px; }
+  .app.collapsed .brand-text, .app.collapsed .nav a > span, .app.collapsed .nav-soon > span, .app.collapsed .soon-tag, .app.collapsed .nav-label,
+  html[dir="rtl"] .app.collapsed .brand-text, html[dir="rtl"] .app.collapsed .nav a > span, html[dir="rtl"] .app.collapsed .nav-label { opacity: 1; transform: none; pointer-events: auto; transition-delay: 0s; }
+  .app.collapsed .nav-label { height: 36px; padding: 14px 13px 6px; }
+  .app.collapsed .sidebar-head { flex-direction: row; gap: 6px; }
+  .app.collapsed .brand { flex: 1; width: auto; }
   .collapse-btn { display: none; }
   .scrim { display: block; position: fixed; inset: 0; background: rgba(20,40,63,.4); z-index: 35; opacity: 0; pointer-events: none; transition: opacity .2s; }
   .app.drawer-open .scrim { opacity: 1; pointer-events: auto; }
@@ -496,6 +521,9 @@ dialog.modal[open] { animation: pop .26s var(--ease); }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .sidebar, .app { transition: none; }
+  .nav-pill { transition: none; }
+  .brand-text, .nav a > span, .nav-soon > span, .soon-tag, .nav-label { transition: none !important; }
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
 
@@ -565,7 +593,6 @@ dialog.modal[open] { animation: pop .26s var(--ease); }
 .menu-item .icon { color: var(--muted-2); }
 .nav-soon { display: flex; align-items: center; gap: 11px; padding: 8px 13px; border-radius: 8px; color: #7F93AB; font-weight: 500; font-size: 13.5px; white-space: nowrap; cursor: default; }
 .soon-tag { margin-inline-start: auto; font-style: normal; font-size: 10.5px; font-weight: 600; letter-spacing: .03em; color: #8FA1B7; border: 1px solid rgba(255,255,255,.14); border-radius: 6px; padding: 0 6px; }
-.app.collapsed .nav-soon span, .app.collapsed .soon-tag { opacity: 0; }
 .icon-btn:disabled, .global-search input:disabled { cursor: default; }
 .icon-btn:disabled:hover { background: transparent; color: var(--text-2); }
 

@@ -252,12 +252,14 @@ function MoreMenu({ actions, onPick }: { actions: WorkflowAction[]; onPick: (a: 
 type ShellProps = { busy: boolean; error: string | null; onClose: () => void };
 
 /** Modal frame: Cancel + a submit button, and the server's error shown inline. */
-function Shell({ title, description, submit, danger, canSubmit = true, onSubmit, busy, error, onClose, children, wide }: ShellProps & {
+function Shell({ title, description, submit, danger, canSubmit = true, blockedReason, onSubmit, busy, error, onClose, children, wide }: ShellProps & {
   title: string;
   description?: React.ReactNode;
   submit: string;
   danger?: boolean;
   canSubmit?: boolean;
+  /** Why the submit button is disabled, shown beside it. */
+  blockedReason?: string | null;
   onSubmit: () => void;
   children?: React.ReactNode;
   wide?: boolean;
@@ -265,6 +267,7 @@ function Shell({ title, description, submit, danger, canSubmit = true, onSubmit,
   return (
     <Modal open onClose={onClose} title={title} description={description} wide={wide}
       footer={<>
+        {blockedReason && !busy && <span className="foot-why" role="status">{blockedReason}</span>}
         <button className="btn ghost" type="button" onClick={onClose} disabled={busy}>Cancel</button>
         <button className={"btn " + (danger ? "danger" : "primary") + (busy ? " is-busy" : "")} type="button" disabled={busy || !canSubmit} onClick={onSubmit}>
           {busy && <Spinner />}{busy ? "Working…" : submit}
@@ -354,19 +357,27 @@ function DecisionForm({ title, yes, no, yesHint, noHint, reasonLabel, evidence, 
   );
 }
 
-/** Assignee as a fixed chip, others pickable; warns when the reviewer or tester is among them. */
-function ContributorPicker({ t, people, value, onChange, extraBlocked }: {
-  t: TicketDetail; people: DirectoryEntry[]; value: number[]; onChange: (v: number[]) => void; extraBlocked?: number | null;
+/** Assignee as a fixed chip, others pickable. The reviewer (as currently chosen) and the tester can't be picked. */
+function ContributorPicker({ t, people, value, onChange, reviewerId, reviewerClash = true }: {
+  t: TicketDetail; people: DirectoryEntry[]; value: number[]; onChange: (v: number[]) => void;
+  /** Who is (or will be) the reviewer. */
+  reviewerId: number | null;
+  /** Show a message when a contributor is the reviewer (the submit form shows that next to the reviewer field instead). */
+  reviewerClash?: boolean;
 }) {
   const exclude = useMemo(() => {
     const m = new Map<number, string>();
-    if (t.reviewer) m.set(t.reviewer.id, "Reviewer — must stay independent");
+    if (reviewerId != null) m.set(reviewerId, "Reviewer — must stay independent");
     if (t.tester) m.set(t.tester.id, "Tester — must stay independent");
-    if (extraBlocked != null) m.set(extraBlocked, "Chosen as reviewer");
     return m;
-  }, [t.reviewer, t.tester, extraBlocked]);
+  }, [reviewerId, t.tester]);
+  const nameOf = (id: number) => people.find((p) => p.id === id)?.fullName ?? (t.assignee?.id === id ? t.assignee.fullName : "Someone");
   const all = [...(t.assignee ? [t.assignee.id] : []), ...value];
-  const clashes = all.filter((id) => exclude.has(id)).map((id) => people.find((p) => p.id === id)?.fullName ?? (t.assignee?.id === id ? t.assignee.fullName : "Someone"));
+  const notes: string[] = [];
+  for (const id of all) {
+    if (t.tester?.id === id) notes.push(`${nameOf(id)} is the tester, so they can't be a code contributor.${t.assignee?.id === id ? " They are also the assignee, so change the tester first." : ""}`);
+    else if (reviewerClash && reviewerId === id) notes.push(`${nameOf(id)} is the reviewer, so they can't be a code contributor.`);
+  }
   return (
     <div className="field">
       <span className="field-label">Code contributors</span>
@@ -379,39 +390,48 @@ function ContributorPicker({ t, people, value, onChange, extraBlocked }: {
       </div>
       <UserPicker multi people={people.filter((p) => p.id !== t.assignee?.id)} value={value} onChange={onChange} exclude={exclude}
         prefer={["DEVELOPER"]} placeholder="Add anyone else who wrote code" />
-      {clashes.length > 0 && (
-        <p className="err" role="alert">
-          {clashes.join(", ")} {clashes.length > 1 ? "are" : "is"} the reviewer or tester, so can&apos;t also be a code contributor. Change that person first.
-        </p>
-      )}
+      {notes.map((n) => <p key={n} className="err" role="alert">{n}</p>)}
     </div>
   );
 }
 
 function SubmitReviewForm({ t, people, run, ...shell }: ShellProps & { t: TicketDetail; people: DirectoryEntry[]; run: Run }) {
   const [contributors, setContributors] = useState<number[]>(t.contributors.filter((c) => c.id !== t.assignee?.id).map((c) => c.id));
-  const [reviewer, setReviewer] = useState<number | null>(null);
-  const needsReviewer = !t.reviewer;
-  const chosenReviewer = t.reviewer?.id ?? reviewer;
+  const [reviewer, setReviewer] = useState<number | null>(t.reviewer?.id ?? null);
+  const editable = t.can.assignReviewer || !t.reviewer;
+  const nameOf = (id: number) => people.find((p) => p.id === id)?.fullName ?? (t.assignee?.id === id ? t.assignee.fullName : t.reviewer?.id === id ? t.reviewer.fullName : "Someone");
+
   const contributing = new Set([...(t.assignee ? [t.assignee.id] : []), ...contributors]);
-  const clash = (chosenReviewer != null && contributing.has(chosenReviewer)) || (t.tester != null && contributing.has(t.tester.id));
-  const reviewerExclude = new Map<number, string>([...contributing].map((id) => [id, "Contributing code — not independent"] as [number, string]));
+  let reviewerNote: string | null = null;
+  if (reviewer != null) {
+    if (t.assignee?.id === reviewer) reviewerNote = `${nameOf(reviewer)} is the assignee, so they count as a code contributor and can't review. ${editable ? "Choose a different reviewer." : "Ask someone who can assign reviewers to change the reviewer."}`;
+    else if (contributing.has(reviewer)) reviewerNote = `${nameOf(reviewer)} is listed as a code contributor, so they can't review. ${editable ? "Choose a different reviewer or remove them from the contributors." : "Remove them from the contributors."}`;
+    else if (t.tester?.id === reviewer) reviewerNote = `${nameOf(reviewer)} is the tester, so they can't also review. ${editable ? "Choose a different reviewer." : "Ask someone who can assign reviewers to change the reviewer."}`;
+  }
+  const testerClash = t.tester != null && contributing.has(t.tester.id);
+
+  const reviewerExclude = new Map<number, string>();
+  for (const id of contributing) reviewerExclude.set(id, id === t.assignee?.id ? "Assignee — counts as a contributor" : "Contributing code — not independent");
   if (t.tester) reviewerExclude.set(t.tester.id, "Already the tester");
 
+  const why = reviewer == null ? "Choose a code reviewer to continue." : reviewerNote || testerClash ? "Resolve the conflict above to continue." : null;
+  const current = t.reviewer;
+
   return (
-    <Shell {...shell} wide title="Submit for review" submit="Submit for review" canSubmit={chosenReviewer != null && !clash}
+    <Shell {...shell} wide title="Submit for review" submit="Submit for review" canSubmit={why == null} blockedReason={why}
       description="Say who contributed code. They can't review or test this ticket."
-      onSubmit={() => run("submit-review", { contributorIds: contributors, ...(needsReviewer ? { reviewerId: reviewer } : {}) }, "Submitted for review")}>
-      <ContributorPicker t={t} people={people} value={contributors} onChange={setContributors} extraBlocked={needsReviewer ? reviewer : null} />
+      onSubmit={() => run("submit-review", { contributorIds: contributors, ...(reviewer != null && reviewer !== t.reviewer?.id ? { reviewerId: reviewer } : {}) }, "Submitted for review")}>
+      <ContributorPicker t={t} people={people} value={contributors} onChange={setContributors} reviewerId={reviewer} reviewerClash={false} />
       <div className="field">
         <span className="field-label">Code reviewer</span>
-        {needsReviewer ? (
+        {editable ? (
           <UserPicker people={people} value={reviewer} onChange={setReviewer} exclude={reviewerExclude} prefer={["DEVELOPER"]} placeholder="Choose who will review" />
-        ) : (
+        ) : current ? (
           <div className="chip-row">
-            <span className="picker-chip fixed"><Avatar name={t.reviewer!.fullName} color={t.reviewer!.avatarColor} size="xs" /><span dir="auto">{t.reviewer!.fullName}</span></span>
+            <span className="picker-chip fixed"><Avatar name={current.fullName} color={current.avatarColor} size="xs" /><span dir="auto">{current.fullName}</span></span>
           </div>
-        )}
+        ) : null}
+        {reviewerNote && <p className="err" role="alert">{reviewerNote}</p>}
       </div>
     </Shell>
   );
@@ -424,7 +444,7 @@ function ContributorsForm({ t, people, run, ...shell }: ShellProps & { t: Ticket
     <Shell {...shell} wide title="Edit code contributors" submit="Save" canSubmit={!clash}
       description="Everyone who wrote code for this fix. The reviewer and tester can't be on the list."
       onSubmit={() => run("contributors", { contributorIds: contributors }, "Contributors updated")}>
-      <ContributorPicker t={t} people={people} value={contributors} onChange={setContributors} />
+      <ContributorPicker t={t} people={people} value={contributors} onChange={setContributors} reviewerId={t.reviewer?.id ?? null} />
     </Shell>
   );
 }
