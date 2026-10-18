@@ -68,6 +68,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className={["app", collapsed ? "collapsed" : "", drawer ? "drawer-open" : ""].filter(Boolean).join(" ")}>
       <aside className="sidebar">
+        <div className="sidebar-head">
         <Link className="brand" href="/tickets">
           <span className="brand-mark">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -77,21 +78,22 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </span>
           <span className="brand-text"><strong>APA Ticketing System</strong><span>Port of Alexandria</span></span>
         </Link>
+          <button
+            className="collapse-btn"
+            type="button"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!collapsed}
+            onClick={() => { const v = !collapsed; setCollapsed(v); writePref("ats-collapsed", v ? "1" : "0"); }}
+          >
+            <Icon name="collapse" />
+          </button>
+        </div>
         <nav className="nav" aria-label="Main">
           {main.map(navLink)}
           {admin.length > 0 && <div className="nav-label">Administration</div>}
           {admin.map(navLink)}
         </nav>
-        <div className="sidebar-foot">
-          <button
-            className="collapse-btn"
-            type="button"
-            onClick={() => { const v = !collapsed; setCollapsed(v); writePref("ats-collapsed", v ? "1" : "0"); }}
-          >
-            <Icon name="collapse" />
-            <span>Collapse</span>
-          </button>
-        </div>
       </aside>
       <div className="scrim" onClick={() => setDrawer(false)} />
 

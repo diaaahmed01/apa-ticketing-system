@@ -109,7 +109,8 @@ button { font: inherit; color: inherit; }
   overflow: hidden;
   z-index: 40;
 }
-.brand { display: flex; align-items: center; gap: 10px; padding: 4px 6px 16px; min-height: 48px; text-decoration: none; }
+.sidebar-head { display: flex; align-items: center; gap: 6px; padding-bottom: 16px; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 4px 6px; min-height: 40px; min-width: 0; flex: 1; text-decoration: none; overflow: hidden; }
 .brand-mark { width: 32px; height: 32px; flex: none; border-radius: 8px; background: var(--blue); display: grid; place-items: center; color: #fff; }
 .brand-mark svg { width: 18px; height: 18px; }
 .brand-text { line-height: 1.2; white-space: nowrap; transition: opacity .15s; }
@@ -117,10 +118,10 @@ button { font: inherit; color: inherit; }
 .brand-text span { font-size: 12px; color: #8FA1B7; }
 .app.collapsed .brand-text { opacity: 0; pointer-events: none; }
 .nav { display: flex; flex-direction: column; gap: 2px; flex: 1; overflow-y: auto; overflow-x: hidden; }
-.nav-label { font-size: 11px; font-weight: 600; color: #7489A2; padding: 14px 10px 6px; white-space: nowrap; letter-spacing: .02em; }
+.nav-label { font-size: 11px; font-weight: 600; color: #7489A2; padding: 14px 13px 6px; white-space: nowrap; letter-spacing: .02em; }
 .nav a {
   display: flex; align-items: center; gap: 11px;
-  padding: 8px 10px; border-radius: 8px;
+  padding: 8px 13px; border-radius: 8px;
   color: #C3CFDD; text-decoration: none; font-weight: 500; font-size: 13.5px;
   white-space: nowrap; position: relative;
   transition: background .15s, color .15s;
@@ -130,10 +131,14 @@ button { font: inherit; color: inherit; }
 .nav a.active .icon { color: #8CC0FF; }
 .nav a .count { margin-inline-start: auto; font-size: 11.5px; font-weight: 600; background: rgba(255,255,255,.1); color: #E4ECF5; padding: 1px 7px; border-radius: 10px; font-variant-numeric: tabular-nums; }
 .nav a .count.hot { background: var(--blue); color: #fff; }
-.sidebar-foot { border-top: 1px solid rgba(255,255,255,.08); padding-top: 10px; margin-top: 8px; }
-.collapse-btn { display: flex; align-items: center; gap: 11px; width: 100%; background: none; border: 0; color: #8FA1B7; padding: 8px 10px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
-.collapse-btn:hover { background: rgba(255,255,255,.06); color: #fff; }
-.app.collapsed .nav a span, .app.collapsed .nav a .count, .app.collapsed .nav-label, .app.collapsed .collapse-btn span { opacity: 0; pointer-events: none; }
+.collapse-btn { flex: none; width: 30px; height: 30px; display: grid; place-items: center; background: none; border: 0; color: #8FA1B7; border-radius: 7px; cursor: pointer; }
+.collapse-btn:hover { background: rgba(255,255,255,.08); color: #fff; }
+.collapse-btn:focus-visible { outline: 2px solid #8CC0FF; outline-offset: 1px; }
+.collapse-btn .icon { width: 16px; height: 16px; }
+/* Collapsed: the toggle sits under the brand mark, both centred on the 68px rail (icon centre = 34px). */
+.app.collapsed .sidebar-head { flex-direction: column; gap: 8px; }
+.app.collapsed .brand { flex: none; width: 44px; }
+.app.collapsed .nav a span, .app.collapsed .nav a .count, .app.collapsed .nav-label { opacity: 0; pointer-events: none; }
 .app.collapsed .nav-label { height: 10px; padding: 0; }
 .app.collapsed .collapse-btn .icon { transform: scaleX(-1); }
 html[dir="rtl"] .collapse-btn .icon { transform: scaleX(-1); }
@@ -558,7 +563,7 @@ dialog.modal[open] { animation: pop .26s var(--ease); }
 .menu-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0; background: none; border-radius: 8px; color: var(--text); font: inherit; font-size: 13.5px; font-weight: 500; text-decoration: none; cursor: pointer; text-align: start; }
 .menu-item:hover, .menu-item:focus-visible { background: var(--bg); color: var(--navy); }
 .menu-item .icon { color: var(--muted-2); }
-.nav-soon { display: flex; align-items: center; gap: 11px; padding: 8px 10px; border-radius: 8px; color: #7F93AB; font-weight: 500; font-size: 13.5px; white-space: nowrap; cursor: default; }
+.nav-soon { display: flex; align-items: center; gap: 11px; padding: 8px 13px; border-radius: 8px; color: #7F93AB; font-weight: 500; font-size: 13.5px; white-space: nowrap; cursor: default; }
 .soon-tag { margin-inline-start: auto; font-style: normal; font-size: 10.5px; font-weight: 600; letter-spacing: .03em; color: #8FA1B7; border: 1px solid rgba(255,255,255,.14); border-radius: 6px; padding: 0 6px; }
 .app.collapsed .nav-soon span, .app.collapsed .soon-tag { opacity: 0; }
 .icon-btn:disabled, .global-search input:disabled { cursor: default; }
